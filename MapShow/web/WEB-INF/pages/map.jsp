@@ -42,10 +42,10 @@
     <div style="position:absolute; top: 58px; right: 8px; z-index: 1000;margin: 10px;padding: 10px;margin: 5px">
         <div class="btn-group" data-toggle="buttons" style="margin-left: 10px;width: 100%;">
             <label class="btn btn-primary" style="width: 44%" id="noshow">
-                <input type="radio" name="show"  autocomplete="off"  > 不显示
+                <input type="radio" name="show" autocomplete="off"> 不显示
             </label>
-            <label class="btn btn-primary active" style="width: 44%;margin-left: 5px" id="speedshow" >
-                <input type="radio" name="show" autocomplete="off" checked="checked"  > 平均速度
+            <label class="btn btn-primary active" style="width: 44%;margin-left: 5px" id="speedshow">
+                <input type="radio" name="show" autocomplete="off" checked="checked"> 平均速度
             </label>
         </div>
         <br/>
@@ -53,12 +53,19 @@
         </select>
         <br/>
         <div>
-        <button id="previous" type="button" class="btn btn-success" style="width: 44%;font-size: 15px;margin-left: 10px">Previous</button>
-        <button id="next" type="button" class="btn btn-success" style="width: 44%;font-size: 15px">Next</button>
+            <button id="previous" type="button" class="btn btn-success"
+                    style="width: 44%;font-size: 15px;margin-left: 10px">Previous
+            </button>
+            <button id="next" type="button" class="btn btn-success" style="width: 44%;font-size: 15px">Next</button>
         </div>
 
         <div style="padding-top: 5px">
-            <button id="showTrajs" type="button" class="btn btn-success" style="width: 65%;font-size: 15px;margin-left: 10px">显示轨迹</button>
+            <button id="showTrajs" type="button" class="btn btn-success"
+                    style="width: 65%;font-size: 15px;margin-left: 10px">显示轨迹
+            </button>
+        </div>
+        <div>
+            <textarea id="trajsInfo" style = "font-size:20px;margin-top: 5px;margin-left: 10px" rows="10" hidden readonly></textarea>
         </div>
     </div>
 
@@ -106,13 +113,13 @@
     //    })
 
 
-    var speedColors = ["#FF3300", "#FF6600", "#FF9900", "#FFCC00", "#CCCC33", "#99CC00", "#CCFF00", "#33FF00"]
-    var speedSplit = 10;
+    var speedColors = ["#FF6600", "#FFCC00", "#99CC00", "#CCFF00", "#33FF00"]
+    var speedSplit = 15;
 
 
     //leaflet 加载高德地图
     var normalm = L.tileLayer.chinaProvider('GaoDe.Normal.Map', {
-        maxZoom: 18,
+//        maxZoom: 18,
         minZoom: 5
     });
     var normal = L.layerGroup([normalm])
@@ -121,8 +128,8 @@
         zoom: 13,
         layers: [normal],
         zoomContro: false,
-        maxZoom:15,
-        minZoom:13
+//        maxZoom: 18,
+        minZoom: 13
     });
 
 
@@ -152,24 +159,28 @@
     var timeIndex = -1;
     var showIndex = 1;//显示按钮组索引
 
+    var trajsPolyline = new Array()
+    var pointsCircle = new Array()
     var trajs = null;
 
 
     function getBytime() {
-        $.ajax({
-            type: "POST",
-            url: "/show/getByTime.json",
-            async: false,
-            cache: false,
-            dataType: "json",
-            data: {
-                time: times[timeIndex]
-            },
-            success: function (data) {
-                clearSpeeds()
-                drawSpeeds(data)
-            }
-        })
+        if (showIndex == 1) {
+            $.ajax({
+                type: "POST",
+                url: "/show/getByTime.json",
+                async: false,
+                cache: false,
+                dataType: "json",
+                data: {
+                    time: times[timeIndex]
+                },
+                success: function (data) {
+                    clearSpeeds()
+                    drawSpeeds(data)
+                }
+            })
+        }
     }
 
     $(document).ready(function () {
@@ -188,7 +199,7 @@
                     value = "" + (i) * speedSplit + "+"
             else
                 value = "1-" + (i + 1) * speedSplit
-            $("#legendSwitch").append('<div> <div class="block" style="background:' + speedColors[i] + '"></div> <div class="label">' + value + '</div> </div>')
+            $("#legendSwitch").append('<div> <div class="block" style="background:' + speedColors[i] + ';opacity:0.8"></div> <div class="label">' + value + '</div> </div>')
         }
 
         $.ajax({
@@ -231,9 +242,9 @@
 
                 //显示前一时间段的网格图
                 $("#previous").click(function () {
-                    if(timeIndex<=0) {
+                    if (timeIndex <= 0) {
                         timeIndex = 0
-                    }else {
+                    } else {
                         timeIndex = parseInt(timeIndex) - 1;
                         getBytime()
                         $("#selectTime").val(timeIndex)
@@ -244,7 +255,7 @@
 
                 //显示后一时间段的网格图
                 $("#next").click(function () {
-                    if(timeIndex<times.length - 1){
+                    if (timeIndex < times.length - 1) {
                         timeIndex = parseInt(timeIndex) + 1;
                         getBytime()
                         $("#selectTime").val(timeIndex)
@@ -254,7 +265,7 @@
 
                 //不显示网格图
                 $("#noshow").click(function () {
-                    if(showIndex != 0 ) {
+                    if (showIndex != 0) {
                         showIndex = 0
                         clearSpeeds()
                         clearInitial()
@@ -264,7 +275,7 @@
 
                 //显示平均速度网格图
                 $('#speedshow').on('click', function () {
-                    if(showIndex != 1 ) {
+                    if (showIndex != 1) {
                         showIndex = 1
                         initialize()
                         getBytime()
@@ -272,7 +283,7 @@
                 })
                 //显示轨迹
                 $('#showTrajs').click(function () {
-                    if($('#showTrajs').text() == "显示轨迹") {
+                    if ($('#showTrajs').text().trim() == "显示轨迹") {
                         $('#showTrajs').text("取消显示轨迹")
                         if (trajs == null) {
                             $.ajax({
@@ -286,12 +297,19 @@
                                 }
                             })
                         }
+                        $('#trajsInfo').attr("hidden",false)
+                        trajsPolyline.push(drawOneTrajs(0))
 
-                        alert(trajs.length)
-
-
-                    }else{
+                    } else {
                         $('#showTrajs').text("显示轨迹")
+                        $('#trajsInfo').attr("hidden",true)
+                        $('#trajsInfo').text("")
+                        var length = trajsPolyline.length
+                        for (i = 0; i < length; ++i)
+                            trajsPolyline.pop().remove()
+                        length = pointsCircle.length
+                        for (i = 0; i < length; ++i)
+                            pointsCircle.pop().remove()
                     }
                 })
 
@@ -301,13 +319,13 @@
     })
 
 
-    function timeFormat(time){
-        return time.substring(0,4)+"/"+time.substring(4,6)+"/"+time.substring(6,8)+" "+time.substring(8,10)+":"+time.substring(10,12)
+    function timeFormat(time) {
+        return time.substring(0, 4) + "/" + time.substring(4, 6) + "/" + time.substring(6, 8) + " " + time.substring(8, 10) + ":" + time.substring(10, 12)
     }
 
     //从m/s转换到km/h
     function speedFormat(speed) {
-        return speed*3.6
+        return speed * 3.6
     }
 
     function clearSpeeds() {
@@ -334,20 +352,45 @@
                     if (number > speedColors.length) {
                         number = speedColors.length - 1;
                     }
-                    lX = (rightUpX - intervalX * i).toString();
-                    lTopX = (rightUpX - intervalX * i).toString();
-                    rTopX = (rightUpX - intervalX * (i + 1)).toString();
-                    rX = (rightUpX - intervalX * (i + 1)).toString();
+                    lX = (leftBottomX + intervalX * i).toString();
+                    lTopX = (leftBottomX + intervalX * i).toString();
+                    rTopX = (leftBottomX + intervalX * (i + 1)).toString();
+                    rX = (leftBottomX + intervalX * (i + 1)).toString();
 
-                    lY = (rightUpY - intervalY * j).toString();
-                    lTopY = (rightUpY - intervalY * (j + 1)).toString();
-                    rTopY = (rightUpY - intervalY * (j + 1)).toString();
-                    rY = (rightUpY - intervalY * j).toString();
-                    speedsPolygon.push(drawGrid([lX, lY, lTopX, lTopY, rTopX, rTopY, rX, rY], speedColors[parseInt(number)], 1))
+                    lY = (leftBottomY + intervalY * j).toString();
+                    lTopY = (leftBottomY  + intervalY * (j + 1)).toString();
+                    rTopY = (leftBottomY  + intervalY * (j + 1)).toString();
+                    rY = (leftBottomY  + intervalY * j).toString();
+                    speedsPolygon.push(drawGrid([lX, lY, lTopX, lTopY, rTopX, rTopY, rX, rY], speedColors[parseInt(number)], 0.8))
                 }
 
             }
         }
+    }
+
+    function drawOneTrajs(trajIndex) {
+
+
+        var traj = trajs[trajIndex];
+        var lonlats = traj.lonlats;
+        var latlngs = new Array()
+        for (i = 0; i < lonlats.length; ++i) {
+            latlngs.push([lonlats[i][1], lonlats[i][0]])
+        }
+//        alert(traj.times.length)
+        var polyline = L.polyline(latlngs, {color: 'red'}).addTo(map);
+        for (i = 0; i < latlngs.length; ++i) {
+//            alert(traj.times[i]+","+latlngs[i])
+            $('#trajsInfo').text($('#trajsInfo').text()+traj.times[i]+","+latlngs[i][1]+","+latlngs[i][0] + "\n")
+            pointsCircle.push(L.circle(latlngs[i], {radius: 1, color: "blue", attribution: "1"}).addTo(map).on('click', function (e) {
+//                alert(traj.times[i])
+
+//                alert(e.getAttribution())
+            }));
+
+        }
+        // zoom the map to the polyline
+        return polyline
     }
 
 
@@ -374,7 +417,7 @@
             [lonlats[3], lonlats[2]],
             [lonlats[5], lonlats[4]],
             [lonlats[7], lonlats[6]]
-        ],{color:"#272727",opacity:0.2,weight:1,fillColor:fillColor,fillOpacity:fillOpacity}).addTo(map);
+        ], {color: "#272727", opacity: 0.2, weight: 1, fillColor: fillColor, fillOpacity: fillOpacity}).addTo(map);
         return polygon
     }
 
@@ -396,15 +439,15 @@
 
         for (var i = 0; i < partX; i++) {
             for (var j = 0; j < partY; j++) {
-                lX = (rightUpX - intervalX * i).toString();
-                lTopX = (rightUpX - intervalX * i).toString();
-                rTopX = (rightUpX - intervalX * (i + 1)).toString();
-                rX = (rightUpX - intervalX * (i + 1)).toString();
+                lX = (leftBottomX + intervalX * i).toString();
+                lTopX = (leftBottomX + intervalX * i).toString();
+                rTopX = (leftBottomX + intervalX * (i + 1)).toString();
+                rX = (leftBottomX + intervalX * (i + 1)).toString();
 
-                lY = (rightUpY - intervalY * j).toString();
-                lTopY = (rightUpY - intervalY * (j + 1)).toString();
-                rTopY = (rightUpY - intervalY * (j + 1)).toString();
-                rY = (rightUpY - intervalY * j).toString();
+                lY = (leftBottomY + intervalY * j).toString();
+                lTopY = (leftBottomY  + intervalY * (j + 1)).toString();
+                rTopY = (leftBottomY  + intervalY * (j + 1)).toString();
+                rY = (leftBottomY  + intervalY * j).toString();
                 initialPolygon.push(drawGrid([lX, lY, lTopX, lTopY, rTopX, rTopY, rX, rY], "#4f4f4f", 0.3))
             }
         }
@@ -434,9 +477,9 @@
 
 
     //地图点击出现经纬度坐标事件
-//    var clickEventListener = map.on('click', function (e) {
-//        alert(e.lnglat.getLng() + ',' + e.lnglat.getLat())
-//    });
+    //    var clickEventListener = map.on('click', function (e) {
+    //        alert(e.lnglat.getLng() + ',' + e.lnglat.getLat())
+    //    });
 
 
 </script>

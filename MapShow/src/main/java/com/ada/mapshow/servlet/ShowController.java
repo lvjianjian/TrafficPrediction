@@ -28,18 +28,18 @@ import java.util.Map;
 public class ShowController {
 
     private double[] region = new double[]{116.26954, 39.828598, 116.49167, 39.997132};
-    private String speedPath = Parameter.PROJECTPATH + "data" + File.separator + "80_80_30";
+    private String speedPath = Parameter.PROJECTPATH + "data" + File.separator + "5TimeWindow_10MinEdges_maxMaxEdges_20MinSectionLength" + File.separator + "48_48_20";
 
     @RequestMapping(value = "/map.do")
-    public String show(){
+    public String show() {
         return "map";
     }
 
 
-    @RequestMapping(value = "/roadsWithNum.json",method = RequestMethod.POST)
+    @RequestMapping(value = "/roadsWithNum.json", method = RequestMethod.POST)
     @ResponseBody
-    public HashMap<String, Object> roadsWithNum(){
-        RoadMap load = RoadMap.load(Parameter.VERTEXPATH,Parameter.EDGEPATH);
+    public HashMap<String, Object> roadsWithNum() {
+        RoadMap load = RoadMap.load(Parameter.VERTEXPATH, Parameter.EDGEPATH);
         System.out.println("request /show/roadsWithNum.json");
         int[] split = new int[]{2500, 5000, 10000};
         List<Long>[] lists = Tool.roadClassificationByNum(RoadsWithNum.load(Parameter.PROJECTPATH + "result\\r_min100"), split, null);
@@ -57,26 +57,26 @@ public class ShowController {
             }
         }
         HashMap<String, Object> result = new HashMap<>();
-        result.put("split",split);
-        result.put("lists",doubles);
+        result.put("split", split);
+        result.put("lists", doubles);
         return result;
     }
 
-    @RequestMapping(value = "/times.json",method = RequestMethod.POST)
+    @RequestMapping(value = "/times.json", method = RequestMethod.POST)
     @ResponseBody
-    public Map<String,Object> getTimes(){
+    public Map<String, Object> getTimes() {
         AllAvgSpeedCondition load = AllAvgSpeedCondition.load(speedPath);
         HashMap<String, Object> objectObjectHashMap = new HashMap<>();
-        objectObjectHashMap.put("xnum",load.getX_num());
-        objectObjectHashMap.put("ynum",load.getY_num());
-        objectObjectHashMap.put("region",region);
-        objectObjectHashMap.put("times",load.getTimes());
+        objectObjectHashMap.put("xnum", load.getX_num());
+        objectObjectHashMap.put("ynum", load.getY_num());
+        objectObjectHashMap.put("region", region);
+        objectObjectHashMap.put("times", load.getTimes());
         return objectObjectHashMap;
     }
 
-    @RequestMapping(value = "/getByTime.json",method = RequestMethod.POST)
+    @RequestMapping(value = "/getByTime.json", method = RequestMethod.POST)
     @ResponseBody
-    public float[][] getAvgSpeedConditionByTime(String time){
+    public float[][] getAvgSpeedConditionByTime(String time) {
         AllAvgSpeedCondition load = AllAvgSpeedCondition.load(speedPath);
         AvgSpeedCondition avgSpeedCondition = load.get(time);
         float[][] speeds = avgSpeedCondition.getSpeeds();
@@ -84,15 +84,15 @@ public class ShowController {
     }
 
 
-    @RequestMapping(value = "/someTrajs.json",method = RequestMethod.POST)
+    @RequestMapping(value = "/someTrajs.json", method = RequestMethod.POST)
     @ResponseBody
-    public List<Trajectory> getSomeTrajs(){
+    public List<Trajectory> getSomeTrajs() {
         List<Trajectory> trajectories = new ArrayList<>();
         try {
-            BufferedReader bufferedReader = new BufferedReader(new FileReader(Parameter.PROJECTPATH+"data\\20160229233000_20160301000000"));
-            String s =null;
-            while ((s = bufferedReader.readLine())!=null){
-                if(s.contains(",")){
+            BufferedReader bufferedReader = new BufferedReader(new FileReader(Parameter.PROJECTPATH + "data\\20160229233000_20160301000000"));
+            String s = null;
+            while ((s = bufferedReader.readLine()) != null) {
+                if (s.contains(",")) {
                     Trajectory trajectory = Trajectory.readOne(s);
                     trajectories.add(trajectory);
                 }

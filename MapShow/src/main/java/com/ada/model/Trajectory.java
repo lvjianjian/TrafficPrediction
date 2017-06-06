@@ -37,6 +37,11 @@ public class Trajectory {
         return edgeIds;
     }
 
+
+    public List<double[]> getLonlats() {
+        return lonlats;
+    }
+
     public void setEdgeIds(List<Long> edgeIds) {
         this.edgeIds = edgeIds;
         //转换到经纬度时候抛掉最后一个点使得长度与时间对应

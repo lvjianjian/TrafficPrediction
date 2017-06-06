@@ -100,10 +100,11 @@ object Tool {
 
 
   def main(args: Array[String]): Unit = {
-    println(timeFormatByMinute("20160301000501",5))
-//    println(timeDifference("20160301153959", "20160301155111"))
+//    println(timeFormatByMinute("20160301000501",5))
+//    println(timeDifference("20160301000026", "20160301000129"))
 //    println(timeFormatByMinute("20160301153959", 5))
 //    println("%dTimeWindow_%dMinEdges_%dMaxEdges_%dMinSectionLength".format(1, 1, 1, 1))
+    println(getGridXY(Array(116.26954, 39.828598, 116.49167, 39.997132),80,80,(116.386463,39.845849)))
   }
 }
 
