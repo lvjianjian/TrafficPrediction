@@ -65,7 +65,15 @@
             </button>
         </div>
         <div>
-            <textarea id="trajsInfo" style = "font-size:20px;margin-top: 5px;margin-left: 10px" rows="10" hidden readonly></textarea>
+            <textarea id="trajsInfo" style="font-size:20px;margin-top: 5px;margin-left: 10px" rows="10" hidden
+                      readonly></textarea>
+        </div>
+
+        <div class="input-group" style="margin: 10px">
+            <input id="speed" type="text" class="form-control" placeholder="speed" aria-describedby="basic-addon1"
+                   style="width: 44%">
+            <input id="num" type="text" class="form-control" placeholder="num" aria-describedby="basic-addon1"
+                   style="width: 44%">
         </div>
     </div>
 
@@ -111,9 +119,8 @@
     //            }
     //        });
     //    })
-
-
-    var speedColors = ["#FF6600", "#FFCC00", "#99CC00", "#CCFF00", "#33FF00"]
+                                                        //"#CCFF00",
+    var speedColors = ["#FF6600", "#FFCC00", "#99CC00",  "#33FF00"]
     var speedSplit = 15;
 
 
@@ -297,12 +304,12 @@
                                 }
                             })
                         }
-                        $('#trajsInfo').attr("hidden",false)
+                        $('#trajsInfo').attr("hidden", false)
                         trajsPolyline.push(drawOneTrajs(0))
 
                     } else {
                         $('#showTrajs').text("显示轨迹")
-                        $('#trajsInfo').attr("hidden",true)
+                        $('#trajsInfo').attr("hidden", true)
                         $('#trajsInfo').text("")
                         var length = trajsPolyline.length
                         for (i = 0; i < length; ++i)
@@ -343,25 +350,40 @@
     }
 
 
-    function drawSpeeds(speeds) {
+    function drawSpeeds(data) {
+        var speeds = data.speeds
+        var nums = data.weights
         for (i = 0; i < speeds.length; ++i) {
             for (j = 0; j < speeds.length; ++j) {
                 var speed = speedFormat(speeds[i][j])
-                if (speed > 1) {
-                    var number = speed / speedSplit;
-                    if (number > speedColors.length) {
-                        number = speedColors.length - 1;
-                    }
-                    lX = (leftBottomX + intervalX * i).toString();
-                    lTopX = (leftBottomX + intervalX * i).toString();
-                    rTopX = (leftBottomX + intervalX * (i + 1)).toString();
-                    rX = (leftBottomX + intervalX * (i + 1)).toString();
+                var weight = nums[i][j]
+                if(weight > 2) {
+                    if (speed > 1) {
+                        var number = speed / speedSplit;
+                        if (number > speedColors.length) {
+                            number = speedColors.length - 1;
+                        }
+                        lX = (leftBottomX + intervalX * i).toString();
+                        lTopX = (leftBottomX + intervalX * i).toString();
+                        rTopX = (leftBottomX + intervalX * (i + 1)).toString();
+                        rX = (leftBottomX + intervalX * (i + 1)).toString();
 
-                    lY = (leftBottomY + intervalY * j).toString();
-                    lTopY = (leftBottomY  + intervalY * (j + 1)).toString();
-                    rTopY = (leftBottomY  + intervalY * (j + 1)).toString();
-                    rY = (leftBottomY  + intervalY * j).toString();
-                    speedsPolygon.push(drawGrid([lX, lY, lTopX, lTopY, rTopX, rTopY, rX, rY], speedColors[parseInt(number)], 0.8))
+                        lY = (leftBottomY + intervalY * j).toString();
+                        lTopY = (leftBottomY + intervalY * (j + 1)).toString();
+                        rTopY = (leftBottomY + intervalY * (j + 1)).toString();
+                        rY = (leftBottomY + intervalY * j).toString();
+                        var item = drawGrid([lX, lY, lTopX, lTopY, rTopX, rTopY, rX, rY], speedColors[parseInt(number)], 0.8);
+                        item.on('click', function (ev) {
+                            var latlng = ev.latlng;
+                            var lat = latlng.lat
+                            var lng = latlng.lng
+                            var x = parseInt((lng - leftBottomX) / intervalX)
+                            var y = parseInt((lat - leftBottomY) / intervalY)
+                            $('#speed').val(speeds[x][y] * 3.6)
+                            $('#num').val(nums[x][y])
+                        })
+                        speedsPolygon.push(item)
+                    }
                 }
 
             }
@@ -381,8 +403,12 @@
         var polyline = L.polyline(latlngs, {color: 'red'}).addTo(map);
         for (i = 0; i < latlngs.length; ++i) {
 //            alert(traj.times[i]+","+latlngs[i])
-            $('#trajsInfo').text($('#trajsInfo').text()+traj.times[i]+","+latlngs[i][1]+","+latlngs[i][0] + "\n")
-            pointsCircle.push(L.circle(latlngs[i], {radius: 1, color: "blue", attribution: "1"}).addTo(map).on('click', function (e) {
+            $('#trajsInfo').text($('#trajsInfo').text() + traj.times[i] + "," + latlngs[i][1] + "," + latlngs[i][0] + "\n")
+            pointsCircle.push(L.circle(latlngs[i], {
+                radius: 1,
+                color: "blue",
+                attribution: "1"
+            }).addTo(map).on('click', function (e) {
 //                alert(traj.times[i])
 
 //                alert(e.getAttribution())
@@ -445,9 +471,9 @@
                 rX = (leftBottomX + intervalX * (i + 1)).toString();
 
                 lY = (leftBottomY + intervalY * j).toString();
-                lTopY = (leftBottomY  + intervalY * (j + 1)).toString();
-                rTopY = (leftBottomY  + intervalY * (j + 1)).toString();
-                rY = (leftBottomY  + intervalY * j).toString();
+                lTopY = (leftBottomY + intervalY * (j + 1)).toString();
+                rTopY = (leftBottomY + intervalY * (j + 1)).toString();
+                rY = (leftBottomY + intervalY * j).toString();
                 initialPolygon.push(drawGrid([lX, lY, lTopX, lTopY, rTopX, rTopY, rX, rY], "#4f4f4f", 0.3))
             }
         }

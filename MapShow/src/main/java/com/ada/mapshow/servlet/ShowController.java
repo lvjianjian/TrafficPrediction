@@ -28,7 +28,8 @@ import java.util.Map;
 public class ShowController {
 
     private double[] region = new double[]{116.26954, 39.828598, 116.49167, 39.997132};
-    private String speedPath = Parameter.PROJECTPATH + "data" + File.separator + "5TimeWindow_10MinEdges_maxMaxEdges_20MinSectionLength" + File.separator + "48_48_20";
+    //    private String speedPath2 = Parameter.PROJECTPATH + "data" + File.separator + "5TimeWindow_10MinEdges_maxMaxEdges_0MinSectionLength" + File.separator + "48_48_20";
+    private String speedPath = Parameter.PROJECTPATH + "data" + File.separator + "avgspeedfromrow" + File.separator + "withNum" + File.separator + "48_48_20";
 
     @RequestMapping(value = "/map.do")
     public String show() {
@@ -76,11 +77,15 @@ public class ShowController {
 
     @RequestMapping(value = "/getByTime.json", method = RequestMethod.POST)
     @ResponseBody
-    public float[][] getAvgSpeedConditionByTime(String time) {
+    public HashMap<String, Object> getAvgSpeedConditionByTime(String time) {
         AllAvgSpeedCondition load = AllAvgSpeedCondition.load(speedPath);
         AvgSpeedCondition avgSpeedCondition = load.get(time);
         float[][] speeds = avgSpeedCondition.getSpeeds();
-        return speeds;
+        int[][] weights = avgSpeedCondition.getWeight();
+        HashMap<String,Object> objectObjectHashMap = new HashMap<>();
+        objectObjectHashMap.put("speeds",speeds);
+        objectObjectHashMap.put("weights",weights);
+        return objectObjectHashMap;
     }
 
 

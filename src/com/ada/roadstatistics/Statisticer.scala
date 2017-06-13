@@ -204,24 +204,65 @@ class Statisticer(val sc: SparkContext) extends Logging with Serializable {
 
   /**
     * 从原始 map maching 后的轨迹出发统计各个grid在各个时间区间的平均速度（这里是以轨迹为单位统计的，物理意义比上面的方式强）
-    * @param region 划分区域（左下角经纬度+右上角经纬度）
-    * @param lon_split 经度划分数
-    * @param lat_split 纬度划分数
+    *
+    * @param time_window 统计的时间窗大小
+    * @param min_edges   过滤轨迹的最小边数
+    * @param max_edges   过滤轨迹的最大边数
+    * @param region      划分区域（左下角经纬度+右上角经纬度）
+    * @param lon_split   经度划分数
+    * @param lat_split   纬度划分数
     */
-  def regionAvgSpeedFromRowTraj(region: Array[Double], lon_split: Int, lat_split: Int): Unit ={
+  def regionAvgSpeedFromRowTraj(time_window: Int, min_edges: Int, max_edges: Int, region: Array[Double], lon_split: Int, lat_split: Int): Unit = {
     val loader = new GraphLoader(sc)
     val edges_RDD = loader.loadEdgeFromDataSource(Parameter.edge_data_path)
     val edges_broadcast = sc.broadcast(edges_RDD.collect().toMap)
     val vertex_RDD = loader.loadVertexFromDataSource(Parameter.vertex_data_path)
     val vertex_broadcast = sc.broadcast(vertex_RDD.collect().toMap)
     val traj_RDD: RDD[(Long, Array[Long], Array[String])] = new TrajectoryLoader(sc).loadTrajectoryFromDataSource(Parameter.traj_data_path, min_edges, max_edges) //Parameter.traj_data_path
-    traj_RDD.map({
-      temp=>
+    val xytspeed_RDD: RDD[((Int, Int, String), Float)] = traj_RDD.flatMap({
+      temp =>
         val edges = temp._2
         val times = temp._3
-
+        var list: List[((Int, Int, String), Float)] = Nil
+        var index: Int = 0
+        while (index < edges.length - 1) {
+          var xy: (Int, Int) = null
+          xy = Tool.getGridXY(region, lon_split, lat_split, vertex_broadcast.value.get(edges_broadcast.value.get(edges(index)).get._1).get)
+          if(xy._1 != -1 && xy._2!= -1) {
+            var startTime: String = null;
+            startTime = Tool.timeFormatByMinute(times(index), time_window)
+            var distance: Float = 0;
+            var timeDifference: Int = 0;
+            while (index < edges.length - 1
+              && xy == Tool.getGridXY(region, lon_split, lat_split, vertex_broadcast.value.get(edges_broadcast.value.get(edges(index)).get._1).get)
+              && startTime == Tool.timeFormatByMinute(times(index), time_window)) {
+              distance = distance + edges_broadcast.value.get(edges(index)).get._3
+              timeDifference = timeDifference + Tool.timeDifference(times(index), times(index + 1))
+              index = index + 1
+            }
+            if (timeDifference != 0) {
+              list = ((xy._1, xy._2, startTime), distance / timeDifference.toFloat) :: list
+            }
+          }else{
+            index = index + 1
+          }
+        }
+        list
     })
 
+    val savePath = Parameter.HDFS_BASE_RESULT_DIR + "TrafficConditionStatistic/regionAvgSpeedFromRowTraj" +
+      "/min_edges=%d/max_edges=%d".format(min_edges,max_edges) +
+      "/region=%f_%f_%f_%f/lon_split=%d/lat_split=%d".format(region(0), region(1), region(2), region(3), lon_split, lat_split) +
+      "/time_window=%d/withNum".format(time_window)
+
+    xytspeed_RDD.map({
+      temp =>
+        (temp._1, (temp._2, 1))
+    }).reduceByKey((e1, e2) => (e1._1 + e2._1, e1._2 + e2._2)).map({
+      temp => (temp._1._3, (temp._1._1, temp._1._2, temp._2._1 / temp._2._2.toFloat,temp._2._2))
+    }).groupByKey().map({
+      temp => temp._1 + "|" + temp._2.mkString("|")
+    }).coalesce(1).saveAsTextFile(savePath)
 
   }
 
@@ -269,11 +310,14 @@ object Statisticer {
     val sc = new SparkContext(conf)
     val statisticer = new Statisticer(sc)
     //        statisticer.count(5,10,Int.MaxValue,0)
-    val savePath = statisticer.regionCount2(Parameter.HDFS_BASE_RESULT_DIR + "TrafficConditionStatistic/5TimeWindow_10MinEdges_2147483647MaxEdges_20MinSectionLength",
-      statisticer.region3, 48, 48)
+    //    val savePath = statisticer.regionCount2(Parameter.HDFS_BASE_RESULT_DIR + "TrafficConditionStatistic/5TimeWindow_10MinEdges_2147483647MaxEdges_0MinSectionLength",
+    //      statisticer.region3, 48, 48)
     //    val savePath = "E:\\"
-    //        val savePath = "/user/lvzhongjian/result/TrafficConditionStatistic/5TimeWindow_10MinEdges_2147483647MaxEdges_0MinSectionLength/detail/lon_split=80/lat_split=80/region=116.269540_39.828598_116.491670_39.997132"
-    statisticer.regionAvgSpeedFromRegionCount2(savePath, 20)
+    //            val savePath = "/user/lvzhongjian/result/TrafficConditionStatistic/5TimeWindow_10MinEdges_2147483647MaxEdges_0MinSectionLength/detail/lon_split=80/lat_split=80/region=116.269540_39.828598_116.491670_39.997132"
+    //    statisticer.regionAvgSpeedFromRegionCount2(savePath, 20)
     //    statisticer.chooseTrajs("20160229233000","20160301000000")
+
+    statisticer.regionAvgSpeedFromRowTraj(20, 10, Int.MaxValue, statisticer.region3, 48, 48)
+
   }
 }

@@ -1,7 +1,7 @@
 package com.ada.roadstatistics
 
-import java.text.SimpleDateFormat
-import java.util.Date
+import java.time.{Duration, LocalDateTime}
+import java.time.format.DateTimeFormatter
 
 /**
   * Created by zhongjian on 2017/5/23.
@@ -13,20 +13,19 @@ object Tool {
   /**
     * 求时间差
     *
-    * @param start_time YYYYMMDDHHmmss形式
+    * @param start_time yyyyMMddHHmmss形式
     * @param end_time
     * @return
     */
   def timeDifference(start_time: String, end_time: String): Int = {
     if (start_time.length != 14 || end_time.length != 14) {
-      throw new Exception("time should be YYYYMMDDHHmmss")
+      throw new Exception("time should be yyyyMMddHHmmss")
     }
 
-    var df: SimpleDateFormat = new SimpleDateFormat("YYYYMMDDHHmmss")
-    var begin: Date = df.parse(start_time)
-    var end: Date = df.parse(end_time)
-    var between: Long = (end.getTime() - begin.getTime()) / 1000 //转化成秒
-    between.toInt
+    val parse = LocalDateTime.parse(start_time,DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
+    return Duration.between(parse,LocalDateTime.parse(end_time,DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))).getSeconds.toInt
+
+
   }
 
 
@@ -83,9 +82,9 @@ object Tool {
       return (-1, -1)
 
     val x_step = (right_up_lon - left_bottom_lon) / lon_split
-    println(x_step)
+//    println(x_step)
     val y_step = (right_up_lat - left_bottom_lat) / lat_split
-    println(y_step)
+//    println(y_step)
     var x, y = 0
     x = ((vertex_lon - left_bottom_lon) / x_step).toInt
     y = ((vertex_lat - left_bottom_lat) / y_step).toInt
@@ -101,10 +100,13 @@ object Tool {
 
   def main(args: Array[String]): Unit = {
 //    println(timeFormatByMinute("20160301000501",5))
-//    println(timeDifference("20160301000026", "20160301000129"))
+    println(timeDifference("20160229235957", "20160301000000"))
+    println(timeDifference("20160229235957", "20160229235959"))
+    println(timeDifference("20160229235957", "20160302000001"))
 //    println(timeFormatByMinute("20160301153959", 5))
 //    println("%dTimeWindow_%dMinEdges_%dMaxEdges_%dMinSectionLength".format(1, 1, 1, 1))
-    println(getGridXY(Array(116.26954, 39.828598, 116.49167, 39.997132),80,80,(116.386463,39.845849)))
+//    println(getGridXY(Array(116.26954, 39.828598, 116.49167, 39.997132),80,80,(116.386463,39.845849)))
+
   }
 }
 
