@@ -59,10 +59,12 @@ public class AllAvgSpeedCondition {
         String[] split = line.split("\\|");
         String time = split[0];
         AvgSpeedCondition avgSpeedCondition = new AvgSpeedCondition(time, x_num, y_num);
-        for (int i = 1; i < split.length; i++) {
+        for (int i = 1; i < split.length; i++)
+        {
             String[] split1 = split[i].substring(1, split[i].length() - 1).split(",");
             avgSpeedCondition.setSpeed(Integer.valueOf(split1[0]), Integer.valueOf(split1[1]), Float.valueOf(split1[2]));
-            if (split1.length > 3) {
+            if (split1.length > 3)
+            {
                 avgSpeedCondition.setWeight(Integer.valueOf(split1[0]), Integer.valueOf(split1[1]), Integer.valueOf(split1[3]));
             }
         }
@@ -88,17 +90,23 @@ public class AllAvgSpeedCondition {
         allAvgSpeedCondition = new AllAvgSpeedCondition(time_window);
         allAvgSpeedCondition.setX_num(x_num);
         allAvgSpeedCondition.setY_num(y_num);
-        try {
+        try
+        {
             BufferedReader bufferedReader = new BufferedReader(new FileReader(file));
 
             String s = null;
-            while ((s = bufferedReader.readLine()) != null) {
+            while ((s = bufferedReader.readLine()) != null)
+            {
                 if (!s.trim().equals(""))
                     allAvgSpeedCondition.addAvgSpeedCondition(s, x_num, y_num);
             }
-        } catch (FileNotFoundException e) {
+        }
+        catch (FileNotFoundException e)
+        {
             e.printStackTrace();
-        } catch (IOException e) {
+        }
+        catch (IOException e)
+        {
             e.printStackTrace();
         }
         return allAvgSpeedCondition;
@@ -106,9 +114,12 @@ public class AllAvgSpeedCondition {
 
 
     public static AllAvgSpeedCondition load(String path) {
-        synchronized (AllAvgSpeedCondition.class) {
-            if (allAvgSpeedCondition == null) {
-                synchronized (AllAvgSpeedCondition.class) {
+        synchronized (AllAvgSpeedCondition.class)
+        {
+            if (allAvgSpeedCondition == null)
+            {
+                synchronized (AllAvgSpeedCondition.class)
+                {
                     reLoad(path);
                 }
             }
@@ -118,16 +129,19 @@ public class AllAvgSpeedCondition {
 
 
     /**
-     * 将平均速度转换成 拥堵，较为拥堵，较为通畅，通畅 4个类别
+     * 将平均速度转换成 拥堵（1），较为拥堵（2），较为通畅（3），通畅（4） 4个类别, 有些区域无路况信息，label用0表示
      *
-     * @param savePath
+     * @param dataPath
      */
-    public static void toCondition(String dataPath, String savePath) {
-        AllAvgSpeedCondition load = AllAvgSpeedCondition.load(dataPath);
+    public static void toCondition(String dataPath) {
+        String savePath = dataPath + "_condition";
+        AllAvgSpeedCondition load = AllAvgSpeedCondition.reLoad(dataPath);
         List<String> times = load.getTimes();
-        try {
+        try
+        {
             BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(savePath));
-            for (int i = 0; i < times.size(); i++) {
+            for (int i = 0; i < times.size(); i++)
+            {
                 AvgSpeedCondition avgSpeedCondition = load.get(times.get(i));
                 float[][] speeds = avgSpeedCondition.getSpeeds();
                 int[][] weight = avgSpeedCondition.getWeight();
@@ -135,59 +149,83 @@ public class AllAvgSpeedCondition {
                 int y_num = avgSpeedCondition.getY_num();
                 StringBuilder stringBuilder = new StringBuilder();
                 stringBuilder.append(times.get(i));
-                for (int j = 0; j < x_num; j++) {
-                    for (int k = 0; k < y_num; k++) {
-                        if (weight[j][k] > 2) {//最少轨迹数量
-                            int label = -1;
-                            if (speeds[j][k] > 1 && speeds[j][k] <= 15) {//拥堵
-                                label = 0;
-                            } else if (speeds[j][k] > 15 && speeds[j][k] <= 30) {//较为拥堵
-                                label = 1;
-                            } else if (speeds[j][k] > 30 && speeds[j][k] <= 45) {//比较通畅
-                                label = 2;
-                            } else if (speeds[j][k] > 45) {//通畅
-                                label = 3;
-                            }
-                            if (label != -1) {
-                                stringBuilder.append(String.format("|%d,%d,%d,%d", j, k, label, weight[j][k]));
-                            }
+                for (int j = 0; j < x_num; j++)
+                {
+                    for (int k = 0; k < y_num; k++)
+                    {
+                        int label = -1;
+                        float v = (float) (speeds[j][k] * 3.6);
+                        if (v >= 1 && v <= 15)
+                        {//拥堵
+                            label = 1;
+                        }
+                        else if (v > 15 && v <= 30)
+                        {//较为拥堵
+                            label = 2;
+                        }
+                        else if (v > 30 && v <= 45)
+                        {//比较通畅
+                            label = 3;
+                        }
+                        else if (v > 45)
+                        {//通畅
+                            label = 4;
+                        }
+                        else if (v == 0)//无路况区域
+                        {
+                            label = 0;
+                        }
+                        if (label != -1)
+                        {
+                            stringBuilder.append(String.format("|%d,%d,%d", j, k, label));
                         }
                     }
                 }
                 bufferedWriter.write(stringBuilder.toString());
                 bufferedWriter.write("\n");
             }
-        } catch (IOException e) {
+        }
+        catch (IOException e)
+
+        {
             e.printStackTrace();
         }
+
     }
 
 
     public void save(String path) {
-        try {
+        try
+        {
             BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(path));
             this.map.forEach(new BiConsumer<String, AvgSpeedCondition>() {
                 @Override
                 public void accept(String s, AvgSpeedCondition avgSpeedCondition) {
-                    try {
+                    try
+                    {
                         bufferedWriter.write(avgSpeedCondition.getLineString());
                         bufferedWriter.newLine();
-                    } catch (IOException e) {
+                    }
+                    catch (IOException e)
+                    {
                         e.printStackTrace();
                     }
                 }
             });
             bufferedWriter.flush();
             bufferedWriter.close();
-        } catch (IOException e) {
+        }
+        catch (IOException e)
+        {
             e.printStackTrace();
         }
     }
 
     public static void main(String[] args) {
-        String speedPath = Parameter.PROJECTPATH + "data" + File.separator + "avgspeedfromrow" + File.separator + "withNum" + File.separator + "48_48_20";
-        AllAvgSpeedCondition.toCondition(speedPath, Parameter.PROJECTPATH + "data" + File.separator + "avgspeedfromrow" + File.separator + "withNum" + File.separator + "48_48_20_cate");
-//        System.out.println(load.getTimes().size());
+
+        AllAvgSpeedCondition.toCondition(Parameter.PROJECTPATH + "data" + File.separator + "avgspeedfromrow\\2016\\03" + File.separator + "48_48_20_LinearInterpolationFixed");
+        AllAvgSpeedCondition.toCondition(Parameter.PROJECTPATH + "data" + File.separator + "avgspeedfromrow\\2016\\03"  + File.separator + "48_48_20_MaxSpeedFillingFixed_20");
+        //        System.out.println(load.getTimes().size());
     }
 
 
