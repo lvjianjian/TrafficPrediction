@@ -14,7 +14,7 @@ public class AvgSpeedCondition {
     private float[][] speeds;
     private int[][] weight;//每个grid所含的轨迹数
 
-    public AvgSpeedCondition(String time,int x_num,int y_num){
+    public AvgSpeedCondition(String time, int x_num, int y_num) {
         this.time = time;
         this.x_num = x_num;
         this.y_num = y_num;
@@ -22,11 +22,11 @@ public class AvgSpeedCondition {
         weight = new int[x_num][y_num];
     }
 
-    public void setSpeed(int x,int y, float speed){
+    public void setSpeed(int x, int y, float speed) {
         speeds[x][y] = speed;
     }
 
-    public void setWeight(int x,int y,int num){
+    public void setWeight(int x, int y, int num) {
         weight[x][y] = num;
     }
 
@@ -53,4 +53,18 @@ public class AvgSpeedCondition {
     public int[][] getWeight() {
         return weight;
     }
+
+    public String
+    getLineString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append(time);
+        for (int i = 0; i < x_num; i++) {
+            for (int j = 0; j < y_num; j++) {
+                if (speeds[i][j] != 0)
+                    sb.append("|(" + i + "," + j + "," + speeds[i][j] + "," + weight[i][j] + ")");
+            }
+        }
+        return sb.toString();
+    }
+
 }

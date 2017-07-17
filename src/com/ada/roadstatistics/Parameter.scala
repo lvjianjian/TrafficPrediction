@@ -12,6 +12,7 @@ object Parameter{
     * traj data path in hdfs
     */
   val traj_data_path: String = HDFS_NODE_FRONT_PART+"/user/caojiaqing/JqCao/data/trajectory_beijing_new.txt"
+
   /**
     * edge data path in hdfs
     */
@@ -28,4 +29,14 @@ object Parameter{
   val HDFS_BASE_RESULT_DIR = "/user/lvzhongjian/result/"
 
 
+  /**
+    * 2016 edge data path in hdfs
+    */
+  val new_edge_data_path: String = HDFS_NODE_FRONT_PART+"/data/GaoTong/2016/R-G.csv"
+
+
+  /**
+    * 2016 traj data path in hdfs
+    */
+  val new_traj_data_path: String = HDFS_NODE_FRONT_PART+"/data/GaoTong/2016/"
 }

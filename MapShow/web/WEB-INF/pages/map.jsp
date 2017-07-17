@@ -39,7 +39,7 @@
 <body>
 <div class="row">
     <div id="container" style="width: 100% ;height: 100%;"></div>
-    <div style="position:absolute; top: 58px; right: 8px; z-index: 1000;margin: 10px;padding: 10px;margin: 5px">
+    <div style="position:absolute; top: 58px; right: 8px; z-index: 1000;margin: 10px;padding: 10px;margin: 5px;width: 500px">
         <div class="btn-group" data-toggle="buttons" style="margin-left: 10px;width: 100%;">
             <label class="btn btn-primary" style="width: 44%" id="noshow">
                 <input type="radio" name="show" autocomplete="off"> 不显示
@@ -59,21 +59,35 @@
             <button id="next" type="button" class="btn btn-success" style="width: 44%;font-size: 15px">Next</button>
         </div>
 
-        <div style="padding-top: 5px">
-            <button id="showTrajs" type="button" class="btn btn-success"
-                    style="width: 65%;font-size: 15px;margin-left: 10px">显示轨迹
-            </button>
-        </div>
+        <%--<div style="padding-top: 5px">--%>
+            <%--<button id="showTrajs" type="button" class="btn btn-success"--%>
+                    <%--style="width: 65%;font-size: 15px;margin-left: 10px">显示轨迹--%>
+            <%--</button>--%>
+        <%--</div>--%>
         <div>
             <textarea id="trajsInfo" style="font-size:20px;margin-top: 5px;margin-left: 10px" rows="10" hidden
                       readonly></textarea>
         </div>
+        <%--<div class="input-group" style="margin: 10px">--%>
+
+            <%--<input id="x_index" type="text" class="form-control" placeholder="x" aria-describedby="basic-addon1"--%>
+                   <%--style="width: 44%">--%>
+            <%--<input id="y_index" type="text" class="form-control" placeholder="y" aria-describedby="basic-addon1"--%>
+                   <%--style="width: 44%">--%>
+
+        <%--</div>--%>
+
 
         <div class="input-group" style="margin: 10px">
+            <input id="x_index" type="text" class="form-control" placeholder="x" aria-describedby="basic-addon1"
+                   style="width: 24%">
+            <input id="y_index" type="text" class="form-control" placeholder="y" aria-describedby="basic-addon1"
+                   style="width: 24%">
             <input id="speed" type="text" class="form-control" placeholder="speed" aria-describedby="basic-addon1"
-                   style="width: 44%">
+                   style="width: 24%">
             <input id="num" type="text" class="form-control" placeholder="num" aria-describedby="basic-addon1"
-                   style="width: 44%">
+                   style="width: 24%">
+
         </div>
     </div>
 
@@ -132,11 +146,11 @@
     var normal = L.layerGroup([normalm])
     var map = L.map("container", {
         center: [39.90923, 116.397428],
-        zoom: 13,
+        zoom: 12,
         layers: [normal],
         zoomContro: false,
 //        maxZoom: 18,
-        minZoom: 13
+        minZoom: 11
     });
 
 
@@ -357,8 +371,10 @@
             for (j = 0; j < speeds.length; ++j) {
                 var speed = speedFormat(speeds[i][j])
                 var weight = nums[i][j]
-                if(weight > 2) {
-                    if (speed > 1) {
+//                if(weight >= 1)
+                {
+                    if (speed > 0)
+                    {
                         var number = speed / speedSplit;
                         if (number > speedColors.length) {
                             number = speedColors.length - 1;
@@ -381,6 +397,8 @@
                             var y = parseInt((lat - leftBottomY) / intervalY)
                             $('#speed').val(speeds[x][y] * 3.6)
                             $('#num').val(nums[x][y])
+                            $('#x_index').val(x)
+                            $('#y_index').val(y)
                         })
                         speedsPolygon.push(item)
                     }

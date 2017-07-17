@@ -1,13 +1,17 @@
 package com.ada.roadstatistics
 
-import java.time.{Duration, LocalDateTime}
+import java.time.{Duration, LocalDateTime, ZoneOffset}
 import java.time.format.DateTimeFormatter
+
+import org.apache.log4j.Logger
 
 /**
   * Created by zhongjian on 2017/5/23.
   */
 
 object Tool {
+
+  val logger:Logger = Logger.getLogger(getClass.getName)
 
 
   /**
@@ -48,6 +52,16 @@ object Tool {
       substring + "0" + temp
     else
       substring + temp
+  }
+
+
+  /**
+    *
+    * @param timeLong 长整形时间
+    * @return 字符串时间，格式: YYYYMMDDHHmmss形式
+    */
+  def longToStringTime(timeLong:Long): String ={
+    return LocalDateTime.ofEpochSecond(timeLong,0,ZoneOffset.of("+0800")).format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
   }
 
   /**
@@ -95,7 +109,31 @@ object Tool {
     (x, y)
   }
 
-
+  /**
+    * 获取轨迹第index段的起点
+    *
+    * @param edges
+    * @param index
+    * @param start
+    * @param end
+    * @param traj
+    * @return
+    */
+  def getLonLat(edges: Map[Long, ((Double, Double), (Double, Double), Int)], index: Int, start: (Double, Double), end: (Double, Double), traj: Array[Long]): (Double, Double) = {
+    if (index == 0)
+      start
+    else if (index == traj.length - 1)
+      end
+    else {
+      val edge = edges.get(traj(index))
+      if(edge != None)
+        edge.get._1
+      else {
+        logger.error("warning！！！ miss " + traj(index))
+        (-1D, -1D)
+      }
+    }
+  }
 
 
   def main(args: Array[String]): Unit = {
@@ -106,7 +144,11 @@ object Tool {
 //    println(timeFormatByMinute("20160301153959", 5))
 //    println("%dTimeWindow_%dMinEdges_%dMaxEdges_%dMinSectionLength".format(1, 1, 1, 1))
 //    println(getGridXY(Array(116.26954, 39.828598, 116.49167, 39.997132),80,80,(116.386463,39.845849)))
+//    val str = "LINESTRING (116.41563 39.7214, 116.41946 39.72185)"
+//    println(str.split("\\(")(1).split("\\)")(0).split(",")(0).split(" ")(0))
 
+    println(longToStringTime(1459999642))
+    println(longToStringTime(1460002237))
   }
 }
 
