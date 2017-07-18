@@ -29,14 +29,14 @@ def timeToStr(timeStamp):
     return timeStamp.strftime("%Y%m%d%H%M")
 
 
-def loadRawData(path, isComplete=True, complete_value=0):
+def loadRawData(path, isComplete=True, complete_condition_value = Paramater.CONDITION_NO, complete_weight_value = 0):
     """
     读取数据 datas为4阶ndarray,shape(sample_size, z_num, x_num, y_num), 厚度为拥堵程度（0）和轨迹数量权重（1）
             times为1阶ndarray, 存储时间
     补全所有time及其下的data
     :param path: 数据文件名
     :param isComplete: 是否补全
-    :param complete_value: 补全值,默认为0,通畅
+    :param complete_value: 补全值,默认为0,无路况区域
     :return:
     """
     if (isComplete):
@@ -81,7 +81,8 @@ def loadRawData(path, isComplete=True, complete_value=0):
                     ctime = timeToStr(currentTimeStamp)
                     # print "complete,", ctime
                     value = np.zeros((Paramater.Z_NUM, x_num, y_num), dtype=int)
-                    value[:] = complete_value
+                    value[0] = complete_condition_value
+                    value[1] = complete_weight_value
                     if datas is None:
                         datas = [value]
                     else:
@@ -277,6 +278,6 @@ def loadDataFromRaw(paths, nb_flow=1, len_closeness=None, len_period=None, len_t
 
 
 if __name__ == '__main__':
-    DataFileName = "48_48_20_cate"
-    # datas, times, x_num, y_num, interval,_,_ = loadRawData(Paramater.DATAPATH + DataFileName)
-    loadDataFromRaw([Paramater.DATAPATH + DataFileName], len_closeness=3, len_period=1,len_trend=0)
+    datas, times, x_num, y_num, interval,_,_ = loadRawData("E:\\ZhongjianLv\\project\\jamprediction\\RoadStatistics\\JamPredict\\data\\48_48_20_LinearInterpolationFixed_condition")
+    print datas,times
+    # loadDataFromRaw([Paramater.DATAPATH + DataFileName], len_closeness=3, len_period=1,len_trend=0)

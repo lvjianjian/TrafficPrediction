@@ -3,6 +3,14 @@ package com.ada.mapshow;
 import com.ada.global.Parameter;
 
 import java.io.*;
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoField;
+import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalField;
+import java.time.temporal.WeekFields;
 import java.util.*;
 import java.util.function.BiConsumer;
 
@@ -134,9 +142,21 @@ public class AllAvgSpeedCondition {
      * @param dataPath
      */
     public static void toCondition(String dataPath) {
-        String savePath = dataPath + "_condition";
         AllAvgSpeedCondition load = AllAvgSpeedCondition.reLoad(dataPath);
         List<String> times = load.getTimes();
+        int time_window = allAvgSpeedCondition.getTime_window();
+        System.out.println("check data integrity");
+        String startTime = times.get(0);
+        String endTime = times.get(times.size() - 1);
+        LocalDateTime startDateTime = LocalDateTime.parse(startTime, DateTimeFormatter.ofPattern("yyyyMMddHHmm"));
+        LocalDateTime endDateTime = LocalDateTime.parse(endTime, DateTimeFormatter.ofPattern("yyyyMMddHHmm"));
+        long size = Duration.between(startDateTime, endDateTime).get(ChronoUnit.SECONDS) / (time_window * 60);
+        //        assert size == times.size() : "data is not integrity";
+        System.out.println(String.join(",", "start time is " + startTime, "end time is " + endTime
+                , "size should be " + size, "actual is " + times.size(), "data integrity "+ (size == times.size())));
+
+
+        String savePath = dataPath + "_condition";
         try
         {
             BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(savePath));
@@ -177,7 +197,7 @@ public class AllAvgSpeedCondition {
                         }
                         if (label != -1)
                         {
-                            stringBuilder.append(String.format("|%d,%d,%d", j, k, label));
+                            stringBuilder.append(String.format("|%d,%d,%d,%d", j, k, label,weight[j][k]));
                         }
                     }
                 }
@@ -224,7 +244,7 @@ public class AllAvgSpeedCondition {
     public static void main(String[] args) {
 
         AllAvgSpeedCondition.toCondition(Parameter.PROJECTPATH + "data" + File.separator + "avgspeedfromrow\\2016\\03" + File.separator + "48_48_20_LinearInterpolationFixed");
-        AllAvgSpeedCondition.toCondition(Parameter.PROJECTPATH + "data" + File.separator + "avgspeedfromrow\\2016\\03"  + File.separator + "48_48_20_MaxSpeedFillingFixed_20");
+        AllAvgSpeedCondition.toCondition(Parameter.PROJECTPATH + "data" + File.separator + "avgspeedfromrow\\2016\\03" + File.separator + "48_48_20_MaxSpeedFillingFixed_20");
         //        System.out.println(load.getTimes().size());
     }
 
