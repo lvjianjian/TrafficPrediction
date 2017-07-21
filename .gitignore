@@ -9,4 +9,5 @@ MapShow/
 !MapShow/web
 !MapShow/pom.xml
 JamPredict
-!JamPredict/model
+!JamPredict/jampredict
+!JamPredict/scripts
