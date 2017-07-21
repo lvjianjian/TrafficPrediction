@@ -1,0 +1,9 @@
+# Created by .ignore support plugin (hsz.mobi)
+data
+result
+*.xml
+target
+src/main/test
+src/main/resources
+detail*
+5Time*

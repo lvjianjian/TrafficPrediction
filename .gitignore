@@ -4,10 +4,4 @@ target/
 *.txt
 *.PNG
 *.iml
-MapShow/
-!MapShow/src
-!MapShow/web
-!MapShow/pom.xml
-JamPredict
-!JamPredict/jampredict
-!JamPredict/scripts
+

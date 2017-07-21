@@ -12,16 +12,23 @@
 """
 
 import os
+import platform
 
 path = os.environ.get("JamPredictPath")
 if (path is None):
-    PROJECTPATH = "/home/zhongjianlv/TrafficPrediction/JamPredict/"
+    sysstr = platform.system()
+    if(sysstr =="Windows"):
+        PROJECTPATH = "E:\\ZhongjianLv\\project\\jamprediction\\RoadStatistics\\JamPredict\\"
+        # print ("Call Windows tasks")
+    elif(sysstr == "Linux"):
+        # print ("Call Linux tasks")
+        PROJECTPATH = "/home/zhongjianlv/TrafficPrediction/JamPredict/"
 else:
     PROJECTPATH = path
 
 DATAPATH = PROJECTPATH + "data/"
 
-# 第一层为拥挤度(0-3), 第二层为轨迹数量
+# 第一层为拥挤度(0-4), 第二层为轨迹数量
 Z_NUM = 2
 
 CONDITION_NO = 0

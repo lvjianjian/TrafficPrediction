@@ -66,7 +66,6 @@ def main():
             if CACHEDATA:
                 cache(fname, X_train, Y_train, X_test, Y_test,
                       external_dim, timestamp_train, timestamp_test, noConditionRegions, is_mmn)
-
         X_train, Y_train = Data.transformMatrixToCell(X_train, Y_train, noConditionRegions, hasExternal)
         X_test, Y_test = Data.transformMatrixToCell(X_test, Y_test, noConditionRegions, hasExternal)
 
@@ -74,8 +73,10 @@ def main():
             cache(f2name, X_train, Y_train, X_test, Y_test, external_dim, timestamp_train, timestamp_test,
                   list(noConditionRegions), is_mmn)
 
-    classfier = RandomForestClassifier(n_estimators=1000)
+    print "train RF ing .."
+    classfier = RandomForestClassifier(n_estimators=100)
     classfier.fit(X_train, Y_train)
+    print "train finish"
     score = classfier.score(X_test, Y_test)
     print score
 

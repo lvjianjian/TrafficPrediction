@@ -492,7 +492,13 @@ def transformMatrixToCell(X, Y, noConditionRegions, has_external):
     z_num = Y.shape[1]
     x_num = Y.shape[2]
     y_num = Y.shape[3]
-    noConditionRegions = set(noConditionRegions)
+    if type(noConditionRegions) == np.ndarray:
+        noConditionRegionsSet = set()
+        for i in range(noConditionRegions.shape[0]):
+            noConditionRegionsSet.add((noConditionRegions[i][0], noConditionRegions[i][1]))
+        noConditionRegions = noConditionRegionsSet
+    else:
+        noConditionRegions = set(noConditionRegions)
     if not has_external:
         size = sample_size * (z_num * (x_num * y_num - len(noConditionRegions)))
         feature_size = 0
