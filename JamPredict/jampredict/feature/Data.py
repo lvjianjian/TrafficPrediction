@@ -479,7 +479,15 @@ def loadDataFromRaw(paths, noSpeedRegionPath, nb_flow=1, len_closeness=None, len
     # for _X in X_test:
     #     print(_X.shape, )
     # print()
-    return X_train, Y_train, X_test, Y_test, mmn, metadata_dim, timestamp_train, timestamp_test, noConditionRegions
+    return X_train, Y_train, X_test, Y_test, mmn, metadata_dim, timestamp_train, timestamp_test, noConditionRegions, x_num, y_num, nb_flow
+
+
+def getCellSize(matrix_size, x_num, y_num, z_num, noConditionRegionSize):
+    return matrix_size * (z_num * (x_num * y_num - noConditionRegionSize))
+
+
+def getMatrixSize(cell_size, x_num, y_num, z_num, noConditionRegionSize):
+    return cell_size / (z_num * (x_num * y_num - noConditionRegionSize))
 
 
 def transformMatrixToCell(X, Y, noConditionRegions, has_external):
@@ -500,7 +508,7 @@ def transformMatrixToCell(X, Y, noConditionRegions, has_external):
     else:
         noConditionRegions = set(noConditionRegions)
     if not has_external:
-        size = sample_size * (z_num * (x_num * y_num - len(noConditionRegions)))
+        size = getCellSize(sample_size, x_num, y_num, z_num, len(noConditionRegions))
         feature_size = 0
         for _x in X:
             feature_size += _x.shape[1]
@@ -523,6 +531,20 @@ def transformMatrixToCell(X, Y, noConditionRegions, has_external):
     else:
         raise Exception("has_external not impl")
     return new_x, new_y
+
+
+def transformCellToMatrix(predict, sample_size, x_num, y_num, z_num, noConditionRegions):
+    index = 0
+    matrix = np.ndarray(shape=(sample_size, z_num, x_num, y_num))
+    for sample_index in range(sample_size):
+        for i in range(z_num):
+            for x in range(x_num):
+                for y in range(y_num):
+                    if (x, y) in noConditionRegions:
+                        continue
+                    matrix[sample_index, i, x, y] = predict[index]
+                    index += 1
+    return matrix
 
 
 if __name__ == '__main__':

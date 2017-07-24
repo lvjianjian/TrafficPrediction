@@ -57,7 +57,7 @@ def main():
         else:
             datapaths = [Paramater.DATAPATH + "48_48_20_LinearInterpolationFixed_condition"]
             noConditionRegionsPath = Paramater.PROJECTPATH + "data/48_48_20_noSpeedRegion_0.05"
-            X_train, Y_train, X_test, Y_test, mmn, external_dim, timestamp_train, timestamp_test, noConditionRegions = Data.loadDataFromRaw(
+            X_train, Y_train, X_test, Y_test, mmn, external_dim, timestamp_train, timestamp_test, noConditionRegions, x_num, y_num, z_num = Data.loadDataFromRaw(
                 paths=datapaths, noSpeedRegionPath=noConditionRegionsPath, nb_flow=nb_flow, len_closeness=len_closeness,
                 len_period=len_period, len_trend=len_trend
                 , len_test=len_test, maxMinNormalization=is_mmn, preprocess_name='preprocessing.pkl', meta_data=False,
@@ -74,11 +74,12 @@ def main():
                   list(noConditionRegions), is_mmn)
 
     print "train RF ing .."
-    classfier = RandomForestClassifier(n_estimators=100)
+    classfier = RandomForestClassifier(n_estimators=100, n_jobs=-1, random_state=10)
     classfier.fit(X_train, Y_train)
     print "train finish"
     score = classfier.score(X_test, Y_test)
     print score
+
 
 if __name__ == '__main__':
     main()

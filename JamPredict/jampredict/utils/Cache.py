@@ -36,16 +36,20 @@ def read_cache(fname, is_mmn):
     timestamp_train = f['T_train'].value
     timestamp_test = f['T_test'].value
     noConditionRegions = f['noConditionRegions'].value
+    x_num = f['x_num'].value
+    y_num = f['y_num'].value
+    z_num = f['z_num'].value
     f.close()
 
     noConditionRegionsSet = set()
     for i in range(noConditionRegions.shape[0]):
         noConditionRegionsSet.add((noConditionRegions[i][0], noConditionRegions[i][1]))
-    return X_train, Y_train, X_test, Y_test, mmn, external_dim, timestamp_train, timestamp_test, noConditionRegionsSet
+    return X_train, Y_train, X_test, Y_test, mmn, external_dim, timestamp_train, timestamp_test, noConditionRegionsSet, int(
+        x_num), int(y_num), int(z_num)
 
 
 def cache(fname, X_train, Y_train, X_test, Y_test, external_dim, timestamp_train, timestamp_test, noConditionRegions,
-          is_mmn):
+          is_mmn, x_num, y_num, z_num):
     # if is_mmn:
     #     fname = fname.replace(".h5", "_mmn.h5")
     h5 = h5py.File(fname, 'w')
@@ -65,4 +69,19 @@ def cache(fname, X_train, Y_train, X_test, Y_test, external_dim, timestamp_train
     h5.create_dataset('T_train', data=timestamp_train)
     h5.create_dataset('T_test', data=timestamp_test)
     h5.create_dataset('noConditionRegions', data=noConditionRegions)
+    h5.create_dataset('x_num', data=x_num)
+    h5.create_dataset('y_num', data=y_num)
+    h5.create_dataset('z_num', data=z_num)
     h5.close()
+
+
+if __name__ == '__main__':
+    # h5 = h5py.File("test.h5", 'w')
+    # h5.create_dataset('x_num', data=1)
+    # h5.close()
+
+    f = h5py.File("test.h5", 'r')
+    x_num = f['x_num'].value
+    print x_num, type(x_num)
+    print int(x_num)
+    f.close()
