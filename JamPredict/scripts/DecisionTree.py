@@ -133,3 +133,15 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+    # 1
+    # with open("iris.dot", 'w') as f:
+    #     f = tree.export_graphviz(clf, out_file=f)
+    # dot -Tpdf iris.dot -o iris.pdf　
+
+
+    # 2
+    # import pydotplus
+    # dot_data = tree.export_graphviz(clf, out_file=None)
+    # graph = pydotplus.graph_from_dot_data(dot_data)
+    # graph.write_pdf("iris.pdf")
