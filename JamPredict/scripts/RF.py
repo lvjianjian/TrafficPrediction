@@ -16,7 +16,9 @@ import os
 from jampredict.utils import Paramater
 from jampredict.utils.Cache import *
 from jampredict.feature import Data
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
+from sklearn.model_selection import GridSearchCV
+from jampredict.utils import Metric
 
 len_closeness = 3
 len_period = 1
@@ -28,6 +30,9 @@ nb_flow = 1
 
 len_test = 300
 hasExternal = False
+
+random_state = 1337
+grid_cv = True
 
 
 def main():
@@ -45,12 +50,12 @@ def main():
     f2name = fname.replace(".h5", "_cell.h5")
     if CACHEDATA and os.path.exists(f2name):
         print f2name
-        X_train, Y_train, X_test, Y_test, mmn, external_dim, timestamp_train, timestamp_test, noConditionRegions = read_cache(
+        X_train, Y_train, X_test, Y_test, mmn, external_dim, timestamp_train, timestamp_test, noConditionRegions, x_num, y_num, z_num = read_cache(
             f2name, is_mmn)
         print("load %s successfully" % f2name)
     else:
         if os.path.exists(fname) and CACHEDATA:
-            X_train, Y_train, X_test, Y_test, mmn, external_dim, timestamp_train, timestamp_test, noConditionRegions = read_cache(
+            X_train, Y_train, X_test, Y_test, mmn, external_dim, timestamp_train, timestamp_test, noConditionRegions, x_num, y_num, z_num = read_cache(
                 fname, is_mmn)
 
             print("load %s successfully" % fname)
@@ -71,14 +76,62 @@ def main():
 
         if CACHEDATA:
             cache(f2name, X_train, Y_train, X_test, Y_test, external_dim, timestamp_train, timestamp_test,
-                  list(noConditionRegions), is_mmn)
+                  list(noConditionRegions), is_mmn, x_num, y_num, z_num)
 
-    print "train RF ing .."
-    classfier = RandomForestClassifier(n_estimators=100, n_jobs=-1, random_state=10)
+    # grid cv
+    if grid_cv:
+        n_estimators = [20, 40, 60, 80, 100]
+        max_depth = [None, 5, 10, 15]
+        min_samples_split = [2, 4, 6]
+        min_samples_leaf = [1, 2, 3]
+        criterion = ["gini", "entropy"]
+        param_grid = dict(max_depth=max_depth, min_samples_split=min_samples_split,
+                          min_samples_leaf=min_samples_leaf,
+                          criterion=criterion, n_estimators=n_estimators)
+
+        grid = GridSearchCV(estimator=RandomForestClassifier(random_state=random_state, n_jobs=-1), scoring="accuracy",
+                            param_grid=param_grid,
+                            n_jobs=-1, verbose=1)
+        grid.refit = False
+        grid_result = grid.fit(X_train, Y_train)
+
+        print("Best: %f using %s" % (grid_result.best_score_, grid_result.best_params_))
+
+        n_estimators = grid_result.best_params_['n_estimators']
+        max_depth = grid_result.best_params_['max_depth']
+        min_samples_split = grid_result.best_params_['min_samples_split']
+        min_samples_leaf = grid_result.best_params_['min_samples_leaf']
+        criterion = grid_result.best_params_["criterion"]
+
+    else:
+        n_estimators = 20
+        max_depth = 10
+        min_samples_split = 2
+        min_samples_leaf = 2
+        criterion = "entropy"
+
+    classfier = RandomForestClassifier(criterion=criterion,
+                                       n_estimators=n_estimators,
+                                       max_depth=max_depth,
+                                       min_samples_leaf=min_samples_leaf,
+                                       min_samples_split=min_samples_split,
+                                       random_state=random_state,
+                                       n_jobs=-1)
+    print "RF train ing.."
     classfier.fit(X_train, Y_train)
     print "train finish"
     score = classfier.score(X_test, Y_test)
     print score
+
+    predict = classfier.predict(X_test)
+    predict = Data.transformCellToMatrix(predict, Data.getMatrixSize(predict.shape[0], x_num, y_num, z_num,
+                                                                     len(noConditionRegions)), x_num, y_num, z_num,
+                                         noConditionRegions)
+    Y_test = Data.transformCellToMatrix(Y_test, Data.getMatrixSize(Y_test.shape[0], x_num, y_num, z_num,
+                                                                   len(noConditionRegions)), x_num, y_num, z_num,
+                                        noConditionRegions)
+    print("RMSE:", Metric.RMSE(predict, Y_test, noConditionRegions))
+    print("accuracy", Metric.accuracy(predict, Y_test, noConditionRegions))
 
 
 if __name__ == '__main__':

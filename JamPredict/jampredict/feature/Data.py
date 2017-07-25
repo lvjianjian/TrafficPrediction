@@ -128,6 +128,9 @@ def loadRawData(condition_path, nospeed_path, isComplete=True, complete_conditio
 
             for i in range(1, len(split)):
                 xycw = split[i].split(",")
+                # if (len(xycw) < 4):
+                #     print line
+                #     assert
                 for j in range(Paramater.Z_NUM):
                     value[j][int(xycw[0])][int(xycw[1])] = int(xycw[j + 2])
             # ts[pd.Timestamp(split[0])] = value

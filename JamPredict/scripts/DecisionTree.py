@@ -12,6 +12,7 @@
 """
 
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.model_selection import GridSearchCV
 import time, os
 from jampredict.utils import Paramater
 from jampredict.utils.Cache import *
@@ -28,6 +29,10 @@ nb_flow = 1
 
 len_test = 300
 hasExternal = False
+
+grid_cv = True
+
+random_state = 1337
 
 
 def main():
@@ -74,9 +79,47 @@ def main():
             cache(f2name, X_train, Y_train, X_test, Y_test, external_dim, timestamp_train, timestamp_test,
                   list(noConditionRegions), is_mmn, x_num, y_num, z_num)
 
-    classfier = DecisionTreeClassifier(criterion="entropy")
+    # grid cv
+    if grid_cv:
+        max_depth = [None, 5, 10, 15]
+        min_samples_split = [2, 4, 6]
+        min_samples_leaf = [1, 2, 3]
+        criterion = ["gini", "entropy"]
+        param_grid = dict(max_depth=max_depth, min_samples_split=min_samples_split,
+                          min_samples_leaf=min_samples_leaf,
+                          criterion=criterion)
+
+        grid = GridSearchCV(estimator=DecisionTreeClassifier(random_state=random_state), scoring="accuracy",
+                            param_grid=param_grid,
+                            n_jobs=-1, verbose=1)
+        grid.refit = False
+        grid_result = grid.fit(X_train, Y_train)
+
+        print("Best: %f using %s" % (grid_result.best_score_, grid_result.best_params_))
+
+        max_depth = grid_result.best_params_['max_depth']
+        min_samples_split = grid_result.best_params_['min_samples_split']
+        min_samples_leaf = grid_result.best_params_['min_samples_leaf']
+        criterion = grid_result.best_params_["criterion"]
+
+    else:
+        max_depth = 10
+        min_samples_split = 4
+        min_samples_leaf = 1
+        criterion = "gini"
+
+
+    classfier = DecisionTreeClassifier(criterion=criterion,
+                                       max_depth=max_depth,
+                                       min_samples_leaf=min_samples_leaf,
+                                       min_samples_split=min_samples_split,
+                                       random_state=random_state)
+    print "DT train ing.."
     classfier.fit(X_train, Y_train)
+    print "train finish"
     score = classfier.score(X_test, Y_test)
+    print score
+
     predict = classfier.predict(X_test)
     predict = Data.transformCellToMatrix(predict, Data.getMatrixSize(predict.shape[0], x_num, y_num, z_num,
                                                                      len(noConditionRegions)), x_num, y_num, z_num,
@@ -84,7 +127,6 @@ def main():
     Y_test = Data.transformCellToMatrix(Y_test, Data.getMatrixSize(Y_test.shape[0], x_num, y_num, z_num,
                                                                    len(noConditionRegions)), x_num, y_num, z_num,
                                         noConditionRegions)
-    print score
     print("RMSE:", Metric.RMSE(predict, Y_test, noConditionRegions))
     print("accuracy", Metric.accuracy(predict, Y_test, noConditionRegions))
 
