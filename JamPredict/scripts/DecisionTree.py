@@ -30,7 +30,7 @@ nb_flow = 1
 len_test = 300
 hasExternal = False
 
-grid_cv = True
+grid_cv = False
 
 random_state = 1337
 

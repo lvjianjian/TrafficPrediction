@@ -68,8 +68,20 @@ def main():
             cache(f2name, X_train, Y_train, X_test, Y_test, external_dim, timestamp_train, timestamp_test,
                   list(noConditionRegions), is_mmn, x_num, y_num, z_num)
 
-    bl = BaseLine(maxC=1, maxD=1, maxW=1, minSupport=10, minConfidence=10)
+
+    print "baseline start train ing.."
+    bl = BaseLine(maxC=3, maxD=1, maxW=1, minSupport=10, minConfidence=0.9)
     bl.fit(X_train, Y_train, len_closeness, len_period, len_trend)
+    print "baseline train finish"
+    predict = bl.predict(X_test)
+    predict = Data.transformCellToMatrix(predict, Data.getMatrixSize(predict.shape[0], x_num, y_num, z_num,
+                                                                     len(noConditionRegions)), x_num, y_num, z_num,
+                                         noConditionRegions)
+    Y_test = Data.transformCellToMatrix(Y_test, Data.getMatrixSize(Y_test.shape[0], x_num, y_num, z_num,
+                                                                   len(noConditionRegions)), x_num, y_num, z_num,
+                                        noConditionRegions)
+    print("RMSE:", Metric.RMSE(predict, Y_test, noConditionRegions))
+    print("accuracy", Metric.accuracy(predict, Y_test, noConditionRegions))
 
 
 if __name__ == '__main__':
