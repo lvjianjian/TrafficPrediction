@@ -11,7 +11,7 @@ import java.util.List;
 public class LinearInterpolationFixed extends SpeedFixed {
     @Override
     public void fixed(String oldDataPath) {
-        System.out.println("start "+ getMethodName());
+        System.out.println("start " + getMethodName());
         AllAvgSpeedCondition allAvgSpeedCondition = AllAvgSpeedCondition.reLoad(oldDataPath);
         String savePath = oldDataPath + "_" + getMethodName();
 
@@ -23,7 +23,7 @@ public class LinearInterpolationFixed extends SpeedFixed {
         {
             for (int j = 0; j < y_num; j++)
             {
-//                System.out.println("process "+i+","+j);
+                //                System.out.println("process "+i+","+j);
                 if (noSpeedRegion.contains(xyToInt(i, j, y_num)))//无路况区域，直接置为0
                 {
                     for (int k = 0; k < times.size(); k++)
@@ -44,7 +44,7 @@ public class LinearInterpolationFixed extends SpeedFixed {
                         AvgSpeedCondition avgSpeedCondition = allAvgSpeedCondition.get(timeIndex);
                         float speed = avgSpeedCondition.getSpeeds()[i][j];
 
-                        if (speed != 0)
+                        if (speed >= 0.25)
                         {
                             preSpeed = speed;
                             ++startIndex;
@@ -53,18 +53,23 @@ public class LinearInterpolationFixed extends SpeedFixed {
                         {
                             while (k < times.size())//找到后一个速度不为0的值
                             {
-                                if (allAvgSpeedCondition.get(times.get(k)).getSpeeds()[i][j] != 0) break;
+                                if (allAvgSpeedCondition.get(times.get(k)).getSpeeds()[i][j] >= 0.25)
+                                    break;
                                 ++k;
                             }
-                            if(k == times.size())
+                            if (k == times.size())
                                 break;
                             float postSpeed = allAvgSpeedCondition.get(times.get(k)).getSpeeds()[i][j];
                             //如果前速度没有，按后速度填
-                            if (preSpeed == 0)
+                            if (preSpeed < 0.25)
                             {
                                 for (int l = startIndex; l < k; l++)
                                 {
                                     allAvgSpeedCondition.get(times.get(l)).getSpeeds()[i][j] = postSpeed;
+                                    if (allAvgSpeedCondition.get(times.get(l)).getSpeeds()[i][j] == 0)
+                                    {
+                                        System.out.println(i + "," + j + "," + l);
+                                    }
                                 }
                             }
                             else//前后速度都有，线性插值
@@ -74,8 +79,13 @@ public class LinearInterpolationFixed extends SpeedFixed {
                                 for (int l = startIndex; l < k; l++)
                                 {
                                     allAvgSpeedCondition.get(times.get(l)).getSpeeds()[i][j] = (float) (preSpeed + addValue * (l - startIndex + 1));
+                                    if (allAvgSpeedCondition.get(times.get(l)).getSpeeds()[i][j] == 0)
+                                    {
+                                        System.out.println(i + "," + j + "," + l);
+                                    }
                                 }
                             }
+
                             startIndex = k;
                             preSpeed = postSpeed;
                         }
@@ -86,13 +96,25 @@ public class LinearInterpolationFixed extends SpeedFixed {
                         for (int l = startIndex; l < k; l++)
                         {
                             allAvgSpeedCondition.get(times.get(l)).getSpeeds()[i][j] = preSpeed;
+                            if (allAvgSpeedCondition.get(times.get(l)).getSpeeds()[i][j] == 0)
+                            {
+                                System.out.println(i + "," + j + "," + l);
+                            }
                         }
                     }
                 }
             }
-            allAvgSpeedCondition.save(savePath);
+
         }
-        System.out.println("finish "+ getMethodName());
+//        modifyNoCondition(allAvgSpeedCondition,noSpeedRegion);
+
+        allAvgSpeedCondition.save(savePath);
+
+        System.out.println("finish " + getMethodName());
+
+
+
+
     }
 
 

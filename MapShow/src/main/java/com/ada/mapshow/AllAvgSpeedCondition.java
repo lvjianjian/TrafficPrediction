@@ -155,7 +155,8 @@ public class AllAvgSpeedCondition {
         System.out.println(String.join(",", "start time is " + startTime, "end time is " + endTime
                 , "size should be " + size, "actual is " + times.size(), "data integrity "+ (size == times.size())));
 
-
+        int count = 0;
+//        System.out.println("size:"+times.size());
         String savePath = dataPath + "_condition";
         try
         {
@@ -175,7 +176,7 @@ public class AllAvgSpeedCondition {
                     {
                         int label = -1;
                         float v = (float) (speeds[j][k] * 3.6);
-                        if (v >= 1 && v <= 15)
+                        if (v > 0 && v <= 15)
                         {//拥堵
                             label = 1;
                         }
@@ -199,10 +200,14 @@ public class AllAvgSpeedCondition {
                         {
                             stringBuilder.append(String.format("|%d,%d,%d,%d", j, k, label,weight[j][k]));
                         }
+
+                        if(label>0)
+                            count++;
                     }
                 }
                 bufferedWriter.write(stringBuilder.toString());
                 bufferedWriter.write("\n");
+                bufferedWriter.flush();
             }
         }
         catch (IOException e)
@@ -210,6 +215,10 @@ public class AllAvgSpeedCondition {
         {
             e.printStackTrace();
         }
+
+        System.out.println(">0 count:"+count);
+
+
 
     }
 

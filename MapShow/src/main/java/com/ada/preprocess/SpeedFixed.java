@@ -115,6 +115,41 @@ public abstract class SpeedFixed {
         return result;
     }
 
+    protected void modifyNoCondition(AllAvgSpeedCondition allAvgSpeedCondition, List<Integer> noSpeedRegions) {
+        List<String> times = allAvgSpeedCondition.getTimes();
+        int x_num = allAvgSpeedCondition.getX_num();
+        int y_num = allAvgSpeedCondition.getY_num();
+        for (int i = 0; i < times.size(); i++)
+        {
+            String timeIndex = times.get(i);
+            AvgSpeedCondition avgSpeedCondition = allAvgSpeedCondition.get(timeIndex);
+            float[][] speeds = avgSpeedCondition.getSpeeds();
+            for (int x = 0; x < x_num; x++)
+            {
+                for (int y = 0; y < y_num; y++)
+                {
+                    if (noSpeedRegions.contains(xyToInt(x, y, y_num)))
+                        continue;
+                    if (speeds[x][y] == 0)
+                    {
+                        System.out.println("modify" + String.join(",", x + "", y + "", i + ""));
+                        if (i + 1 < times.size() && i - 1 >= 0)
+                            speeds[x][y] = Math.max(allAvgSpeedCondition.get(times.get(i - 1)).getSpeeds()[x][y], allAvgSpeedCondition.get(times.get(i + 1)).getSpeeds()[x][y]);
+                        else
+                        {
+                            if (i - 1 < 0)
+                                speeds[x][y] = allAvgSpeedCondition.get(times.get(i + 1)).getSpeeds()[x][y];
+                            else
+                                speeds[x][y] = allAvgSpeedCondition.get(times.get(i + 1)).getSpeeds()[x][y];
+                        }
+                    }
+                }
+            }
+        }
+
+
+    }
+
     public static int xyToInt(int x, int y, int y_num) {
         return x * y_num + y;
     }
