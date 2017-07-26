@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import pickle
 from Matrix import MyMatrix
-from jampredict.utils import Paramater, minmax_normalization
+from jampredict.utils import Paramater, minmax_normalization,timestamp2vec, load_holiday, load_meteorol
 
 """
 @Author: zhongjianlv
@@ -423,30 +423,33 @@ def loadDataFromRaw(paths, noSpeedRegionPath, nb_flow=1, len_closeness=None, len
         Y.append(_Y)
         timestamps_Y += _timestamps_Y
 
-    # meta_feature = []
-    # if meta_data:
-    #     # load time feature
-    #     time_feature = timestamp2vec(timestamps_Y)
-    #     meta_feature.append(time_feature)
-    # if holiday_data:
-    #     # load holiday
-    #     holiday_feature = load_holiday(timestamps_Y)
-    #     meta_feature.append(holiday_feature)
-    # if meteorol_data:
-    #     # load meteorol data
-    #     meteorol_feature = load_meteorol(timestamps_Y)
-    #     meta_feature.append(meteorol_feature)
-    #
-    # meta_feature = np.hstack(meta_feature) if len(
-    #     meta_feature) > 0 else np.asarray(meta_feature)
-    # metadata_dim = meta_feature.shape[1] if len(
-    #     meta_feature.shape) > 1 else None
-    # if metadata_dim < 1:
-    #     metadata_dim = None
-    # if meta_data and holiday_data and meteorol_data:
-    #     print('time feature:', time_feature.shape, 'holiday feature:', holiday_feature.shape,
-    #           'meteorol feature: ', meteorol_feature.shape, 'mete feature: ', meta_feature.shape)
-    metadata_dim = None
+    meta_feature = []
+    if meta_data:
+        # load time feature
+        time_feature = timestamp2vec(timestamps_Y)
+        meta_feature.append(time_feature)
+        print "meta time shape", time_feature.shape
+    if holiday_data:
+        # load holiday
+        holiday_feature = load_holiday(timestamps_Y)
+        meta_feature.append(holiday_feature)
+        print "holiday shape", holiday_feature.shape
+    if meteorol_data:
+        # load meteorol data
+        meteorol_feature = load_meteorol(timestamps_Y)
+        meta_feature.append(meteorol_feature)
+        print "meteorol_feature shape",meteorol_feature.shape
+
+    meta_feature = np.hstack(meta_feature) if len(
+        meta_feature) > 0 else np.asarray(meta_feature)
+    metadata_dim = meta_feature.shape[1] if len(
+        meta_feature.shape) > 1 else None
+    if metadata_dim < 1:
+        metadata_dim = None
+    if meta_data and holiday_data and meteorol_data:
+        print('time feature:', time_feature.shape, 'holiday feature:', holiday_feature.shape,
+              'meteorol feature: ', meteorol_feature.shape, 'mete feature: ', meta_feature.shape)
+    # metadata_dim = None
 
     XC = np.vstack(XC)
     XP = np.vstack(XP)
@@ -471,17 +474,18 @@ def loadDataFromRaw(paths, noSpeedRegionPath, nb_flow=1, len_closeness=None, len
     print('train shape:', XC_train.shape, XP_train.shape, XT_train.shape, Y_train.shape,
           'test shape: ', XC_test.shape, XP_test.shape, XT_test.shape, Y_test.shape)
 
-    # if metadata_dim is not None:
-    #     meta_feature_train, meta_feature_test = meta_feature[
-    #                                             :-len_test], meta_feature[-len_test:]
-    #     X_train.append(meta_feature_train)
-    #     X_test.append(meta_feature_test)
-    # for _X in X_train:
-    #     print(_X.shape, )
-    # print()
-    # for _X in X_test:
-    #     print(_X.shape, )
-    # print()
+    if metadata_dim is not None:
+        meta_feature_train, meta_feature_test = meta_feature[
+                                                :-len_test], meta_feature[-len_test:]
+        X_train.append(meta_feature_train)
+        X_test.append(meta_feature_test)
+    for _X in X_train:
+        print(_X.shape,)
+    print()
+    for _X in X_test:
+        print(_X.shape,)
+    print()
+
     return X_train, Y_train, X_test, Y_test, mmn, metadata_dim, timestamp_train, timestamp_test, noConditionRegions, x_num, y_num, nb_flow
 
 
