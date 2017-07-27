@@ -46,6 +46,7 @@ path_result = 'RET'
 path_model = 'MODEL'
 
 is_mmn = False  # 是否需要最大最小归一化
+hasExternal = True
 
 
 def build_model(external_dim, x_num, y_num):
@@ -72,15 +73,16 @@ def main():
     ts = time.time()
     if is_mmn:
         fname = os.path.join(Paramater.DATAPATH, 'CACHE',
-                             'TaxiBJ_C{}_P{}_T{}_noExternal_mmn.h5'.format(len_closeness, len_period, len_trend))
+                             'TaxiBJ_C{}_P{}_T{}_{}_mmn.h5'.format(len_closeness, len_period, len_trend,
+                                                                   "External" if hasExternal else "noExternal"))
     else:
         fname = os.path.join(Paramater.DATAPATH, 'CACHE',
-                             'TaxiBJ_C{}_P{}_T{}_noExternal.h5'.format(len_closeness, len_period, len_trend))
+                             'TaxiBJ_C{}_P{}_T{}_{}.h5'.format(len_closeness, len_period, len_trend,
+                                                               "External" if hasExternal else "noExternal"))
     x_num = y_num = 48
     if os.path.exists(fname) and CACHEDATA:
-        X_train, Y_train, X_test, Y_test, mmn, external_dim, timestamp_train, timestamp_test, noConditionRegions = read_cache(
-            fname, is_mmn
-        )
+        X_train, Y_train, X_test, Y_test, mmn, external_dim, \
+        timestamp_train, timestamp_test, noConditionRegions = read_cache(fname, is_mmn)
         print("load %s successfully" % fname)
     else:
         datapaths = [Paramater.DATAPATH + "48_48_20_LinearInterpolationFixed_condition"]
@@ -88,12 +90,14 @@ def main():
         X_train, Y_train, X_test, Y_test, mmn, external_dim, timestamp_train, timestamp_test, noConditionRegions, x_num, y_num, z_num = Data.loadDataFromRaw(
             paths=datapaths, noSpeedRegionPath=noConditionRegionsPath, nb_flow=nb_flow, len_closeness=len_closeness,
             len_period=len_period, len_trend=len_trend
-            , len_test=len_test, maxMinNormalization=is_mmn, preprocess_name='preprocessing.pkl', meta_data=False,
-            meteorol_data=False,
-            holiday_data=False)
+            , len_test=len_test, maxMinNormalization=is_mmn, preprocess_name='preprocessing.pkl',
+            meta_data=hasExternal,
+            meteorol_data=hasExternal,
+            holiday_data=hasExternal)
         if CACHEDATA:
             cache(fname, X_train, Y_train, X_test, Y_test,
-                  external_dim, timestamp_train, timestamp_test, noConditionRegions, is_mmn)
+                  external_dim, timestamp_train, timestamp_test, noConditionRegions, is_mmn, x_num, y_num,
+                  Paramater.Z_NUM)
 
     # print("\n days (test): ", [v[:8] for v in timestamp_test[0::72]])
     print("\nelapsed time (loading data): %.3f seconds\n" % (time.time() - ts))

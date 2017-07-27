@@ -43,21 +43,21 @@ def load_holiday(timeslots, fname=os.path.join(DATAPATH, 'BJ_Holiday.txt')):
     for i, slot in enumerate(timeslots):
         if slot[:8] in holidays:
             H[i] = 1
-    print(H.sum())
     # print(timeslots[H==1])
     return H[:, None]
 
 
-def load_meteorol(timeslots, fname=os.path.join(DATAPATH, 'BJ_Meteorology.h5')):
+def load_meteorol(timeslots, fname=os.path.join(DATAPATH, 'BJ_WEATHER.h5')):
     '''
     timeslots: the predicted timeslots
     In real-world, we dont have the meteorol data in the predicted timeslot, instead, we use the meteoral at previous timeslots, i.e., slot = predicted_slot - timeslot (you can use predicted meteorol data as well)
     '''
     f = h5py.File(fname, 'r')
     Timeslot = f['date'].value
-    WindSpeed = f['WindSpeed'].value
-    Weather = f['Weather'].value
-    Temperature = f['Temperature'].value
+    WindSpeed = f['windspeeds'].value
+    Weather = f['weathers'].value
+    maxTs = f['maxTs'].value
+    minTs = f['minTs'].value
     f.close()
 
     M = dict()  # map timeslot to index
@@ -66,26 +66,32 @@ def load_meteorol(timeslots, fname=os.path.join(DATAPATH, 'BJ_Meteorology.h5')):
 
     WS = []  # WindSpeed
     WR = []  # Weather
-    TE = []  # Temperature
+    maxTE = []  # maxTs
+    minTE = []
+
     for slot in timeslots:
-        predicted_id = M[slot]
+        predicted_id = M[int(slot[:8])]
         cur_id = predicted_id - 1
         WS.append(WindSpeed[cur_id])
         WR.append(Weather[cur_id])
-        TE.append(Temperature[cur_id])
+        maxTE.append(maxTs[cur_id])
+        minTE.append(minTs[cur_id])
 
     WS = np.asarray(WS)
     WR = np.asarray(WR)
-    TE = np.asarray(TE)
-
+    maxTE = np.asarray(maxTE)
+    minTE = np.asarray(minTE)
     # 0-1 scale
-    WS = 1. * (WS - WS.min()) / (WS.max() - WS.min())
-    TE = 1. * (TE - TE.min()) / (TE.max() - TE.min())
-
-    print("shape: ", WS.shape, WR.shape, TE.shape)
+    if WS.max() - WS.min() != 0:
+        WS = 1. * (WS - WS.min()) / (WS.max() - WS.min())
+    else:
+        WS[:] = 0
+    maxTE = 1. * (maxTE - maxTE.min()) / (maxTE.max() - maxTE.min())
+    minTE = 1. * (minTE - minTE.min()) / (minTE.max() - minTE.min())
+    print("shape: ", WS.shape, WR.shape, maxTE.shape, minTE.shape)
 
     # concatenate all these attributes
-    merge_data = np.hstack([WR, WS[:, None], TE[:, None]])
+    merge_data = np.hstack([WR, WS[:, None], maxTE[:, None], minTE[:, None]])
 
     # print('meger shape:', merge_data.shape)
     return merge_data
