@@ -3,4 +3,4 @@ data
 *.pyc
 *.rar
 MODEL/
-*.pkl
+RET/
