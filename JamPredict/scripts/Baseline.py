@@ -19,7 +19,7 @@ is_mmn = False
 nb_flow = 1
 
 len_test = 300
-hasExternal = False
+hasExternal = True
 
 
 # random_state = 1337
@@ -32,10 +32,12 @@ def main():
     ts = time.time()
     if is_mmn:
         fname = os.path.join(Paramater.DATAPATH, 'CACHE',
-                             'TaxiBJ_C{}_P{}_T{}_noExternal_mmn.h5'.format(len_closeness, len_period, len_trend))
+                             'TaxiBJ_C{}_P{}_T{}_{}_mmn.h5'.format(len_closeness, len_period, len_trend,
+                                                                   "External" if hasExternal else "noExternal"))
     else:
         fname = os.path.join(Paramater.DATAPATH, 'CACHE',
-                             'TaxiBJ_C{}_P{}_T{}_noExternal.h5'.format(len_closeness, len_period, len_trend))
+                             'TaxiBJ_C{}_P{}_T{}_{}.h5'.format(len_closeness, len_period, len_trend,
+                                                               "External" if hasExternal else "noExternal"))
 
     f2name = fname.replace(".h5", "_cell.h5")
     if CACHEDATA and os.path.exists(f2name):
@@ -55,9 +57,10 @@ def main():
             X_train, Y_train, X_test, Y_test, mmn, external_dim, timestamp_train, timestamp_test, noConditionRegions, x_num, y_num, z_num = Data.loadDataFromRaw(
                 paths=datapaths, noSpeedRegionPath=noConditionRegionsPath, nb_flow=nb_flow, len_closeness=len_closeness,
                 len_period=len_period, len_trend=len_trend
-                , len_test=len_test, maxMinNormalization=is_mmn, preprocess_name='preprocessing.pkl', meta_data=False,
-                meteorol_data=False,
-                holiday_data=False)
+                , len_test=len_test, maxMinNormalization=is_mmn, preprocess_name='preprocessing.pkl',
+                meta_data=hasExternal,
+                meteorol_data=hasExternal,
+                holiday_data=hasExternal)
             if CACHEDATA:
                 cache(fname, X_train, Y_train, X_test, Y_test,
                       external_dim, timestamp_train, timestamp_test, noConditionRegions, is_mmn, x_num, y_num, z_num)
@@ -67,7 +70,6 @@ def main():
         if CACHEDATA:
             cache(f2name, X_train, Y_train, X_test, Y_test, external_dim, timestamp_train, timestamp_test,
                   list(noConditionRegions), is_mmn, x_num, y_num, z_num)
-
 
     print "baseline start train ing.."
     bl = BaseLine(maxC=3, maxD=1, maxW=1, minSupport=10, minConfidence=0.9)

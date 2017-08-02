@@ -1,6 +1,9 @@
 package com.ada.mapshow;
 
 import com.ada.global.Parameter;
+import com.ada.preprocess.LinearInterpolationFixed;
+import com.ada.preprocess.MaxSpeedFillingFixed;
+import com.ada.preprocess.SpeedFixed;
 
 import java.io.*;
 import java.time.Duration;
@@ -19,7 +22,11 @@ import java.util.function.BiConsumer;
  */
 public class AllAvgSpeedCondition {
 
+    public static double inCompleteDaysThreshold = 0.3;
+
     private Map<String, AvgSpeedCondition> map = new HashMap<>();
+
+    private List<String> removeDays = new ArrayList<>();
 
     private int time_window;
 
@@ -44,6 +51,7 @@ public class AllAvgSpeedCondition {
     public void setY_num(int y_num) {
         this.y_num = y_num;
     }
+
 
     public List<String> getTimes() {
         Set<String> strings = map.keySet();
@@ -117,6 +125,7 @@ public class AllAvgSpeedCondition {
         {
             e.printStackTrace();
         }
+        allAvgSpeedCondition.removeIncompleteDays(inCompleteDaysThreshold);
         return allAvgSpeedCondition;
     }
 
@@ -152,11 +161,10 @@ public class AllAvgSpeedCondition {
         LocalDateTime endDateTime = LocalDateTime.parse(endTime, DateTimeFormatter.ofPattern("yyyyMMddHHmm"));
         long size = Duration.between(startDateTime, endDateTime).get(ChronoUnit.SECONDS) / (time_window * 60);
         //        assert size == times.size() : "data is not integrity";
-        System.out.println(String.join(",", "start time is " + startTime, "end time is " + endTime
-                , "size should be " + size, "actual is " + times.size(), "data integrity "+ (size == times.size())));
+        System.out.println(String.join(",", "start time is " + startTime, "end time is " + endTime, "size should be " + size, "actual is " + times.size(), "data integrity " + (size == times.size())));
 
         int count = 0;
-//        System.out.println("size:"+times.size());
+        //        System.out.println("size:"+times.size());
         String savePath = dataPath + "_condition";
         try
         {
@@ -198,10 +206,10 @@ public class AllAvgSpeedCondition {
                         }
                         if (label != -1)
                         {
-                            stringBuilder.append(String.format("|%d,%d,%d,%d", j, k, label,weight[j][k]));
+                            stringBuilder.append(String.format("|(%d,%d,%d,%d)", j, k, label, weight[j][k]));
                         }
 
-                        if(label>0)
+                        if (label > 0)
                             count++;
                     }
                 }
@@ -216,8 +224,7 @@ public class AllAvgSpeedCondition {
             e.printStackTrace();
         }
 
-        System.out.println(">0 count:"+count);
-
+        System.out.println(">0 count:" + count);
 
 
     }
@@ -227,20 +234,21 @@ public class AllAvgSpeedCondition {
         try
         {
             BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(path));
-            this.map.forEach(new BiConsumer<String, AvgSpeedCondition>() {
-                @Override
-                public void accept(String s, AvgSpeedCondition avgSpeedCondition) {
-                    try
-                    {
-                        bufferedWriter.write(avgSpeedCondition.getLineString());
-                        bufferedWriter.newLine();
-                    }
-                    catch (IOException e)
-                    {
-                        e.printStackTrace();
-                    }
+            List<String> times = this.getTimes();
+            for (int i = 0; i < times.size(); i++)
+            {
+                String s1 = times.get(i);
+                String s = s1.substring(0, 8);
+                if (removeDays.contains(s))
+                {
+                    System.out.println("ignore " + s1);
+                    continue;
                 }
-            });
+                AvgSpeedCondition avgSpeedCondition = this.map.get(s1);
+                bufferedWriter.write(avgSpeedCondition.getLineString());
+                bufferedWriter.newLine();
+            }
+
             bufferedWriter.flush();
             bufferedWriter.close();
         }
@@ -250,10 +258,141 @@ public class AllAvgSpeedCondition {
         }
     }
 
-    public static void main(String[] args) {
+    public void info(List<Integer> noSpeedRegions) {
+        if (noSpeedRegions == null)
+            noSpeedRegions = new LinkedList<>();
+        List<String> times = allAvgSpeedCondition.getTimes();
+        int x_num = allAvgSpeedCondition.getX_num();
+        int y_num = allAvgSpeedCondition.getY_num();
+        int count = 0;
+        double min = Double.MAX_VALUE;
+        double max = Double.MIN_VALUE;
+        String timeMin = null;
+        String timeMax = null;
+        for (int i = 0; i < times.size(); i++)
+        {
+            String timeIndex = times.get(i);
+            AvgSpeedCondition avgSpeedCondition = allAvgSpeedCondition.get(timeIndex);
+            float[][] speeds = avgSpeedCondition.getSpeeds();
+            for (int x = 0; x < x_num; x++)
+            {
+                for (int y = 0; y < y_num; y++)
+                {
+                    if (noSpeedRegions.contains(SpeedFixed.xyToInt(x, y, y_num)))
+                        continue;
+                    if (speeds[x][y] > 0)
+                    {
+                        count++;
+                    }
+                    if (speeds[x][y] > max)
+                    {
+                        max = speeds[x][y];
+                        timeMax = timeIndex;
+                    }
+                    if (speeds[x][y] < min)
+                    {
+                        min = speeds[x][y];
+                        timeMin = timeIndex;
+                    }
 
-        AllAvgSpeedCondition.toCondition(Parameter.PROJECTPATH + "data" + File.separator + "avgspeedfromrow\\2016\\03" + File.separator + "48_48_20_LinearInterpolationFixed");
-        AllAvgSpeedCondition.toCondition(Parameter.PROJECTPATH + "data" + File.separator + "avgspeedfromrow\\2016\\03" + File.separator + "48_48_20_MaxSpeedFillingFixed_20");
+                }
+            }
+
+        }
+
+
+        System.out.println("speed count :" + count + ", should be: " + (times.size() * (x_num * y_num - noSpeedRegions.size())));
+        System.out.println("max speed " + max + ", in " + timeMax);
+        System.out.println("min speed " + min + ", in " + timeMin);
+    }
+
+    public void removeIncompleteDays(double threshold) {
+        int time_window = getTime_window();
+        int size = 24 * 60 / time_window;
+        size *= threshold;
+        List<String> times = getTimes();
+        int count = 1;
+        String preTime = null;
+        for (int i = 0; i < times.size(); i++)
+        {
+            String substring = times.get(i).substring(0, 8);
+            if (!substring.equals(preTime))
+            {
+
+                if (preTime != null)
+                {
+                    if (count < size)
+                    {
+                        removeDays.add(preTime);
+                    }
+
+                    LocalDate pre = LocalDate.parse(preTime, DateTimeFormatter.ofPattern("yyyyMMdd"));
+                    while (pre.plusDays(1).compareTo(LocalDate.parse(substring, DateTimeFormatter.ofPattern("yyyyMMdd"))) != 0)
+                    {
+                        pre = pre.plusDays(1);
+                        removeDays.add(pre.format(DateTimeFormatter.ofPattern("yyyyMMdd")));
+                    }
+
+                }
+                preTime = substring;
+                count = 1;
+            }
+            else
+            {
+                count++;
+            }
+
+        }
+
+        if (preTime != null)
+        {
+            if (count < size)
+            {
+                removeDays.add(preTime);
+            }
+        }
+
+        for (int i = 0; i < removeDays.size(); i++)
+        {
+            System.out.println("remove" + removeDays.get(i));
+        }
+        fill();
+    }
+
+    private void fill() {
+        List<String> times = getTimes();
+        String startTime = times.get(0);
+        for (int i = 1; i < times.size(); i++)
+        {
+            String timeIndex = times.get(i);
+            LocalDateTime pre = LocalDateTime.parse(startTime, Parameter.dateTimeFormatter);
+            LocalDateTime now = LocalDateTime.parse(timeIndex, Parameter.dateTimeFormatter);
+            while (pre.plusMinutes(getTime_window()).compareTo(now) != 0)
+            {
+                pre = pre.plusMinutes(getTime_window());
+                String format = pre.format(Parameter.dateTimeFormatter);
+                if (removeDays.contains(format.substring(0, 8)))
+                {
+                    continue;
+                }
+                this.map.put(format, new AvgSpeedCondition(format, getX_num(), getY_num()));
+            }
+            startTime = timeIndex;
+        }
+
+    }
+
+
+    public static void main(String[] args) {
+        String path = "E:\\ZhongjianLv\\project\\jamprediction\\RoadStatistics\\MapShow\\data\\avgspeedfromrow\\2016\\all\\48_48_20";
+        AllAvgSpeedCondition load = AllAvgSpeedCondition.reLoad(path);
+        new MaxSpeedFillingFixed().fixed(path);
+        new LinearInterpolationFixed().fixed(path);
+        //        load.save("E:\\ZhongjianLv\\project\\jamprediction\\RoadStatistics\\MapShow\\data\\avgspeedfromrow\\48_48_20");
+        //        AllAvgSpeedCondition.toCondition(Parameter.PROJECTPATH + "data" + File.separator + "avgspeedfromrow\\2016\\03" + File.separator + "48_48_20_LinearInterpolationFixed");
+        //        AllAvgSpeedCondition.toCondition(Parameter.PROJECTPATH + "data" + File.separator + "avgspeedfromrow\\2016\\03" + File.separator + "48_48_20_MaxSpeedFillingFixed_20");
+
+
         //        System.out.println(load.getTimes().size());
     }
 

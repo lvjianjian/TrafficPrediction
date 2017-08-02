@@ -3,6 +3,7 @@
 """
 from __future__ import print_function
 import numpy as np
+
 np.random.seed(1337)  # for reproducibility
 
 
@@ -18,7 +19,7 @@ class MinMaxNormalization(object):
     def fit(self, X):
         self._min = X.min()
         self._max = X.max()
-        print("min:", self._min, "max:", self._max)
+        self.printMinMax()
 
     def transform(self, X):
         X = 1. * (X - self._min) / (self._max - self._min)
@@ -33,6 +34,9 @@ class MinMaxNormalization(object):
         X = (X + 1.) / 2.
         X = 1. * X * (self._max - self._min) + self._min
         return X
+
+    def printMinMax(self):
+        print("min:", self._min, "max:", self._max)
 
 
 class MinMaxNormalization_01(object):

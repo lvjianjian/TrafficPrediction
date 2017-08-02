@@ -1,5 +1,6 @@
 package com.ada.preprocess;
 
+import com.ada.global.Parameter;
 import com.ada.mapshow.AllAvgSpeedCondition;
 import com.ada.mapshow.AvgSpeedCondition;
 
@@ -15,7 +16,7 @@ public class MaxSpeedFillingFixed extends SpeedFixed {
     public void fixed(String olddatapath) {
         System.out.println("start " + getMethodName());
         AllAvgSpeedCondition allAvgSpeedCondition = AllAvgSpeedCondition.reLoad(olddatapath);
-        int WEIGHT_THRESHOLD = allAvgSpeedCondition.getTime_window() * 1;
+        int WEIGHT_THRESHOLD = Parameter.MAXSPEEDFIXEDTHRESHOLD;
         String savePath = olddatapath + "_" + getMethodName() + "_" + WEIGHT_THRESHOLD;
         List<Integer> noSpeedRegion = findNoSpeedRegion(olddatapath);
         List<String> times = allAvgSpeedCondition.getTimes();
@@ -38,7 +39,7 @@ public class MaxSpeedFillingFixed extends SpeedFixed {
                         //                        System.out.println(timeIndex);
                         //                        System.out.println(k+","+j);
                         //                        System.out.println("old:"+avgSpeedCondition.getSpeeds()[k][j]);
-                        avgSpeedCondition.getSpeeds()[k][j] = 15;
+                        avgSpeedCondition.getSpeeds()[k][j] = 20;
                         //                        System.out.println("fixed:"+avgSpeedCondition.getSpeeds()[k][j]);
                         //                        System.out.println(allAvgSpeedCondition.get("201602291800").getSpeeds()[0][0]);
                         //                        System.exit(1);
@@ -52,6 +53,7 @@ public class MaxSpeedFillingFixed extends SpeedFixed {
         //        }
 //        modifyNoCondition(allAvgSpeedCondition,noSpeedRegion);
         allAvgSpeedCondition.save(savePath);
+        allAvgSpeedCondition.info(noSpeedRegion);
         System.out.println("finish " + getMethodName());
     }
 

@@ -69,7 +69,7 @@ class BaseLine(object):
         self._minConfidence = minConfidence
 
     def fit(self, X, Y, c, d, w):
-        assert (c + d + w) >= X.shape[1]
+        # assert (c + d + w) >= X.shape[1]
         self._build(X, Y, c, d, w)
 
     def predict(self, X):
@@ -130,6 +130,7 @@ class Node(object):
                 else:
                     self._childs = {}
                     self._choose = best_choose
+                    # print self._choose
                     values = np.unique(self._X[:, self._choose])
                     if best_choose < self._bl._c:
                         self._nc += 1
@@ -139,7 +140,7 @@ class Node(object):
                         self._nw += 1
                     else:
                         self._es.remove(best_choose)
-
+                    # print self._es
                     for value in values:
                         self._childs[value] = Node(self._X[self._X[:, best_choose] == value],
                                                    self._Y[self._X[:, best_choose] == value],
@@ -178,8 +179,10 @@ class Node(object):
         chooses[2] = self._bl._c + self._bl._d + self._nw
         # es
         for i in range(len(self._es)):
-            gains[2 + i] = gain(self._X, self._Y, self._bl._all_labels, choose=self._es[i])
-            chooses[2 + i] = self._es[i]
+            gains[3 + i] = gain(self._X, self._Y, self._bl._all_labels, choose=self._es[i])
+            chooses[3 + i] = self._es[i]
+        # print gains
+        # print chooses
         if (np.max(gains) < 0):
             final_choose = -1
         else:

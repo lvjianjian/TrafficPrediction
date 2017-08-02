@@ -37,7 +37,7 @@ nb_flow = 1
 len_test = 300
 
 nb_residual_unit = 6  # residual unit size
-lr = 0.0005  # learning rate
+lr = 0.0002  # learning rate
 nb_epoch = 500  # number of epoch at training stage
 nb_epoch_cont = 100  # number of epoch at training (cont) stage
 batch_size = 32  # batch size
@@ -73,27 +73,28 @@ def main():
     ts = time.time()
     if is_mmn:
         fname = os.path.join(Paramater.DATAPATH, 'CACHE',
-                             'TaxiBJ_C{}_P{}_T{}_{}_mmn.h5'.format(len_closeness, len_period, len_trend,
-                                                                   "External" if hasExternal else "noExternal"))
+                             'TaxiBJ_C{}_P{}_T{}_{}_mmn_speed.h5'.format(len_closeness, len_period, len_trend,
+                                                                         "External" if hasExternal else "noExternal"))
     else:
         fname = os.path.join(Paramater.DATAPATH, 'CACHE',
-                             'TaxiBJ_C{}_P{}_T{}_{}.h5'.format(len_closeness, len_period, len_trend,
-                                                               "External" if hasExternal else "noExternal"))
+                             'TaxiBJ_C{}_P{}_T{}_{}_speed.h5'.format(len_closeness, len_period, len_trend,
+                                                                     "External" if hasExternal else "noExternal"))
     x_num = y_num = 48
     if os.path.exists(fname) and CACHEDATA:
         X_train, Y_train, X_test, Y_test, mmn, external_dim, \
-        timestamp_train, timestamp_test, noConditionRegions, x_num, y_num, z_num = read_cache(fname, is_mmn)
+        timestamp_train, timestamp_test, noConditionRegions, x_num, y_num, z_num = read_cache(fname, is_mmn,
+                                                                                              'preprocessing_speed.pkl')
         print("load %s successfully" % fname)
     else:
-        datapaths = [Paramater.DATAPATH + "48_48_20_LinearInterpolationFixed_condition"]
+        datapaths = [Paramater.DATAPATH + "48_48_20_MaxSpeedFillingFixed_20"]
         noConditionRegionsPath = Paramater.PROJECTPATH + "data/48_48_20_noSpeedRegion_0.05"
         X_train, Y_train, X_test, Y_test, mmn, external_dim, timestamp_train, timestamp_test, noConditionRegions, x_num, y_num, z_num = Data.loadDataFromRaw(
             paths=datapaths, noSpeedRegionPath=noConditionRegionsPath, nb_flow=nb_flow, len_closeness=len_closeness,
             len_period=len_period, len_trend=len_trend
-            , len_test=len_test, maxMinNormalization=is_mmn, preprocess_name='preprocessing.pkl',
+            , len_test=len_test, maxMinNormalization=is_mmn, preprocess_name='preprocessing_speed.pkl',
             meta_data=hasExternal,
             meteorol_data=hasExternal,
-            holiday_data=hasExternal)
+            holiday_data=hasExternal, isComplete=False)
         if CACHEDATA:
             cache(fname, X_train, Y_train, X_test, Y_test,
                   external_dim, timestamp_train, timestamp_test, noConditionRegions, is_mmn, x_num, y_num,
@@ -109,7 +110,7 @@ def main():
 
     ts = time.time()
     model = build_model(external_dim, x_num=x_num, y_num=y_num)
-    hyperparams_name = 'c{}.p{}.t{}.resunit{}.lr{}.{}.{}'.format(
+    hyperparams_name = 'speed.c{}.p{}.t{}.resunit{}.lr{}.{}.{}'.format(
         len_closeness, len_period, len_trend, nb_residual_unit, lr,
         "External" if hasExternal else "noExternal",
         "MMN" if is_mmn else "noMMN")
@@ -144,7 +145,7 @@ def main():
     model.load_weights(fname_param)
     score = model.evaluate(X_train, Y_train, batch_size=Y_train.shape[0] // 48, verbose=0)
 
-    if mmn is not None:
+    if is_mmn:
         print('Train score: %.6f rmse (norm): %.6f rmse (real): %.6f' %
               (score[0], score[1], score[1] * (mmn._max - mmn._min) / 2.))
     else:
@@ -154,7 +155,7 @@ def main():
     score = model.evaluate(
         X_test, Y_test, batch_size=Y_test.shape[0], verbose=0)
 
-    if mmn is not None:
+    if is_mmn:
         print('Test score: %.6f rmse (norm): %.6f rmse (real): %.6f' %
               (score[0], score[1], score[1] * (mmn._max - mmn._min) / 2.))
     else:
@@ -162,13 +163,17 @@ def main():
               (score[0], score[1]))
 
     if not is_mmn:
-        predict = matrixsRounding(model.predict(X_test))
+        predict = model.predict(X_test)
     else:
-        predict = matrixsRounding(mmn.inverse_transform(model.predict(X_test)))
+        predict = mmn.inverse_transform(model.predict(X_test))
+        Y_test = mmn.inverse_transform(Y_test)
+    print("predict", predict)
+    print("test", Y_test)
     print("RMSE:", Metric.RMSE(predict, Y_test, noConditionRegions))
-    print("accuracy", Metric.accuracy(predict, Y_test, noConditionRegions))
+    # print("accuracy", Metric.accuracy(predict, Y_test, noConditionRegions))
 
     print("\nelapsed time (eval): %.3f seconds\n" % (time.time() - ts))
+    exit(1)
 
     print('=' * 10)
     print("training model (cont)...")
@@ -207,11 +212,11 @@ def main():
               (score[0], score[1]))
 
     if not is_mmn:
-        predict = matrixsRounding(model.predict(X_test))
+        predict = model.predict(X_test)
     else:
-        predict = matrixsRounding(mmn.inverse_transform(model.predict(X_test)))
+        predict = mmn.inverse_transform(model.predict(X_test))
     print("RMSE:", Metric.RMSE(predict, Y_test, noConditionRegions))
-    print("accuracy", Metric.accuracy(predict, Y_test, noConditionRegions))
+    # print("accuracy", Metric.accuracy(predict, Y_test, noConditionRegions))
 
     print("\nelapsed time (eval cont): %.3f seconds\n" % (time.time() - ts))
 

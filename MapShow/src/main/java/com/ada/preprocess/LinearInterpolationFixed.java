@@ -13,12 +13,14 @@ public class LinearInterpolationFixed extends SpeedFixed {
     public void fixed(String oldDataPath) {
         System.out.println("start " + getMethodName());
         AllAvgSpeedCondition allAvgSpeedCondition = AllAvgSpeedCondition.reLoad(oldDataPath);
+
         String savePath = oldDataPath + "_" + getMethodName();
 
         List<String> times = allAvgSpeedCondition.getTimes();
         List<Integer> noSpeedRegion = findNoSpeedRegion(oldDataPath);
         int y_num = allAvgSpeedCondition.getY_num();
         int x_num = allAvgSpeedCondition.getX_num();
+        double min_speed = 0.25;
         for (int i = 0; i < x_num; i++)
         {
             for (int j = 0; j < y_num; j++)
@@ -44,7 +46,7 @@ public class LinearInterpolationFixed extends SpeedFixed {
                         AvgSpeedCondition avgSpeedCondition = allAvgSpeedCondition.get(timeIndex);
                         float speed = avgSpeedCondition.getSpeeds()[i][j];
 
-                        if (speed >= 0.25)
+                        if (speed >= min_speed)
                         {
                             preSpeed = speed;
                             ++startIndex;
@@ -53,7 +55,7 @@ public class LinearInterpolationFixed extends SpeedFixed {
                         {
                             while (k < times.size())//找到后一个速度不为0的值
                             {
-                                if (allAvgSpeedCondition.get(times.get(k)).getSpeeds()[i][j] >= 0.25)
+                                if (allAvgSpeedCondition.get(times.get(k)).getSpeeds()[i][j] >= min_speed)
                                     break;
                                 ++k;
                             }
@@ -61,7 +63,7 @@ public class LinearInterpolationFixed extends SpeedFixed {
                                 break;
                             float postSpeed = allAvgSpeedCondition.get(times.get(k)).getSpeeds()[i][j];
                             //如果前速度没有，按后速度填
-                            if (preSpeed < 0.25)
+                            if (preSpeed < min_speed)
                             {
                                 for (int l = startIndex; l < k; l++)
                                 {
@@ -106,13 +108,11 @@ public class LinearInterpolationFixed extends SpeedFixed {
             }
 
         }
-//        modifyNoCondition(allAvgSpeedCondition,noSpeedRegion);
+        //        modifyNoCondition(allAvgSpeedCondition,noSpeedRegion);
 
         allAvgSpeedCondition.save(savePath);
-
+        allAvgSpeedCondition.info(noSpeedRegion);
         System.out.println("finish " + getMethodName());
-
-
 
 
     }

@@ -33,6 +33,8 @@ public abstract class SpeedFixed {
                 System.out.println("read " + savePath + " ing...");
                 BufferedReader bufferedReader = new BufferedReader(new FileReader(file));
                 int size = new Integer(bufferedReader.readLine());
+                if(size==0)
+                    return result;
                 String[] ints = bufferedReader.readLine().split(",");
                 for (int i = 0; i < ints.length; i++)
                 {

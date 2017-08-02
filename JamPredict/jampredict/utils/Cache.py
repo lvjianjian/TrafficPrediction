@@ -16,9 +16,9 @@ import cPickle as pickle
 import numpy as np
 
 
-def read_cache(fname, is_mmn):
+def read_cache(fname, is_mmn,preprocess_fname='preprocessing.pkl'):
     if (is_mmn):
-        mmn = pickle.load(open('preprocessing.pkl', 'rb'))
+        mmn = pickle.load(open(preprocess_fname, 'rb'))
     else:
         mmn = None
     f = h5py.File(fname, 'r')
@@ -68,6 +68,8 @@ def cache(fname, X_train, Y_train, X_test, Y_test, external_dim, timestamp_train
     h5.create_dataset('external_dim', data=external_dim)
     h5.create_dataset('T_train', data=timestamp_train)
     h5.create_dataset('T_test', data=timestamp_test)
+    if type(noConditionRegions) == set:
+        noConditionRegions = list(noConditionRegions)
     h5.create_dataset('noConditionRegions', data=noConditionRegions)
     h5.create_dataset('x_num', data=x_num)
     h5.create_dataset('y_num', data=y_num)

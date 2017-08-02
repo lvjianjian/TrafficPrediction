@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import pickle
 from Matrix import MyMatrix
-from jampredict.utils import Paramater, minmax_normalization,timestamp2vec, load_holiday, load_meteorol
+from jampredict.utils import Paramater, minmax_normalization, timestamp2vec, load_holiday, load_meteorol
 
 """
 @Author: zhongjianlv
@@ -50,7 +50,7 @@ def intToXY(i, y_num):
 def loadRawData(condition_path, nospeed_path, isComplete=True, complete_condition_value=Paramater.CONDITION_CLEAR,
                 complete_weight_value=0):
     """
-    读取数据 datas为4阶ndarray,shape(sample_size, z_num, x_num, y_num), 厚度为拥堵程度（0）和轨迹数量权重（1）
+    读取数据 datas为4阶ndarray,shape(sample_size, z_num, x_num, y_num), 厚度为拥堵程度（0）或者速度和轨迹数量权重（1）
             times为1阶ndarray, 存储时间
     补全所有time及其下的data
     :param path: 数据文件名
@@ -103,14 +103,15 @@ def loadRawData(condition_path, nospeed_path, isComplete=True, complete_conditio
         # rng = pd.date_range(startTime, endTime, freq=str(interval) + 'min')
         # ts = pd.Series(np.random.randn(len(rng)), index=rng, dtype=np.ndarray)
         for line in lines:
-            value = np.zeros((Paramater.Z_NUM, x_num, y_num), dtype=int)
+            # print line
+            value = np.zeros((Paramater.Z_NUM, x_num, y_num))
             split = line.split("|")
             time = split[0].strip()
             if (isComplete):
                 while (currentTimeStamp != pd.Timestamp(time)):
                     ctime = timeToStr(currentTimeStamp)
                     # print "complete,", ctime
-                    value = np.zeros((Paramater.Z_NUM, x_num, y_num), dtype=int)
+                    value = np.zeros((Paramater.Z_NUM, x_num, y_num))
                     value[0] = complete_condition_value
                     value[1] = complete_weight_value
                     for x, y in nospeed_regions:
@@ -127,12 +128,13 @@ def loadRawData(condition_path, nospeed_path, isComplete=True, complete_conditio
                     currentTimeStamp += timedelta
 
             for i in range(1, len(split)):
-                xycw = split[i].split(",")
+                sp = split[i].strip()
+                xycw = sp[1:len(sp) - 1].split(",")
                 # if (len(xycw) < 4):
                 #     print line
                 #     assert
                 for j in range(Paramater.Z_NUM):
-                    value[j][int(xycw[0])][int(xycw[1])] = int(xycw[j + 2])
+                    value[j][int(xycw[0])][int(xycw[1])] = xycw[j + 2]
             # ts[pd.Timestamp(split[0])] = value
             if datas is None:
                 datas = [value]
@@ -160,7 +162,7 @@ def loadRawData(condition_path, nospeed_path, isComplete=True, complete_conditio
         h5.create_dataset('endTime', data=endTime)
         h5.create_dataset('noConditionRegions', data=nospeed_regions)
         print type(nospeed_regions)
-
+    print datas.shape, times
     return datas, times, x_num, y_num, interval, startTime, endTime, nospeed_regions
 
 
@@ -365,7 +367,8 @@ def copy(x):
 
 def loadDataFromRaw(paths, noSpeedRegionPath, nb_flow=1, len_closeness=None, len_period=None, len_trend=None,
                     len_test=None, maxMinNormalization=False, preprocess_name='preprocessing.pkl',
-                    meta_data=True, meteorol_data=True, holiday_data=True):
+                    meta_data=True, meteorol_data=True, holiday_data=True, isComplete=True,
+                    complete_condition_value=Paramater.CONDITION_CLEAR, complete_weight_value=0):
     """
     """
     if len_closeness is None:
@@ -382,8 +385,8 @@ def loadDataFromRaw(paths, noSpeedRegionPath, nb_flow=1, len_closeness=None, len
     timestamps_all = list()
     for path in paths:
         print("file name: ", path)
-        datas, times, x_num, y_num, interval, startTime, endTime, noConditionRegions = loadRawData(path,
-                                                                                                   noSpeedRegionPath)
+        datas, times, x_num, y_num, interval, startTime, endTime, noConditionRegions = \
+            loadRawData(path, noSpeedRegionPath, isComplete, complete_condition_value, complete_weight_value)
         T = 24 * (60 // interval)
         # remove a certain day which does not have T timestamps
         data, timestamps = remove_incomplete_days(datas, times, T)
@@ -438,7 +441,7 @@ def loadDataFromRaw(paths, noSpeedRegionPath, nb_flow=1, len_closeness=None, len
         # load meteorol data
         meteorol_feature = load_meteorol(timestamps_Y)
         meta_feature.append(meteorol_feature)
-        print "meteorol_feature shape",meteorol_feature.shape
+        print "meteorol_feature shape", meteorol_feature.shape
 
     meta_feature = np.hstack(meta_feature) if len(
         meta_feature) > 0 else np.asarray(meta_feature)
@@ -486,6 +489,11 @@ def loadDataFromRaw(paths, noSpeedRegionPath, nb_flow=1, len_closeness=None, len
         print(_X.shape,)
     print()
 
+    if type(noConditionRegions) == np.ndarray:
+        noConditionRegionsSet = set()
+        for i in range(noConditionRegions.shape[0]):
+            noConditionRegionsSet.add((noConditionRegions[i][0], noConditionRegions[i][1]))
+        noConditionRegions = noConditionRegionsSet
     return X_train, Y_train, X_test, Y_test, mmn, metadata_dim, timestamp_train, timestamp_test, noConditionRegions, x_num, y_num, nb_flow
 
 
@@ -514,35 +522,46 @@ def transformMatrixToCell(X, Y, noConditionRegions, has_external):
         noConditionRegions = noConditionRegionsSet
     else:
         noConditionRegions = set(noConditionRegions)
-    if not has_external:
-        size = getCellSize(sample_size, x_num, y_num, z_num, len(noConditionRegions))
-        feature_size = 0
-        for _x in X:
-            feature_size += _x.shape[1]
-        new_x = np.ndarray(shape=(size, feature_size))
-        new_y = np.ndarray(shape=(size))
-        index = 0
-        for sample_index in range(sample_size):
-            for i in range(z_num):
-                for x in range(x_num):
-                    for y in range(y_num):
-                        if (x, y) in noConditionRegions:
-                            continue
-                        f_index = 0
+
+    size = getCellSize(sample_size, x_num, y_num, z_num, len(noConditionRegions))
+    feature_size = 0
+    for _x in X:
+        feature_size += _x.shape[1]
+    new_x = np.ndarray(shape=(size, feature_size))
+    new_y = np.ndarray(shape=(size))
+    index = 0
+    for sample_index in range(sample_size):
+        for i in range(z_num):
+            for x in range(x_num):
+                for y in range(y_num):
+                    if (x, y) in noConditionRegions:
+                        continue
+                    f_index = 0
+                    if not has_external:
                         for _x in X:
                             for k in range(_x.shape[1] / z_num):
                                 new_x[index][f_index] = _x[sample_index, k * z_num + i, x, y]
                                 f_index += 1
-                        new_y[index] = Y[sample_index, i, x, y]
-                        index += 1
-    else:
-        raise Exception("has_external not impl")
+                    else:
+                        for p in range(len(X) - 1):
+                            _x = X[p]
+                            for k in range(_x.shape[1] / z_num):
+                                new_x[index][f_index] = _x[sample_index, k * z_num + i, x, y]
+                                f_index += 1
+                        _x = X[len(X) - 1]
+                        for k in range(_x.shape[1]):
+                            new_x[index][f_index] = _x[sample_index, k]
+                            f_index += 1
+
+                    new_y[index] = Y[sample_index, i, x, y]
+                    index += 1
     return new_x, new_y
 
 
-def transformCellToMatrix(predict, sample_size, x_num, y_num, z_num, noConditionRegions):
+def transformCellToMatrix(predict, sample_size, x_num, y_num, z_num, noConditionRegions, default_value=0):
     index = 0
     matrix = np.ndarray(shape=(sample_size, z_num, x_num, y_num))
+    matrix[:] = default_value
     for sample_index in range(sample_size):
         for i in range(z_num):
             for x in range(x_num):
