@@ -385,12 +385,12 @@ public class AllAvgSpeedCondition {
 
     public static void main(String[] args) {
         String path = "E:\\ZhongjianLv\\project\\jamprediction\\RoadStatistics\\MapShow\\data\\avgspeedfromrow\\2016\\all\\48_48_20";
-        AllAvgSpeedCondition load = AllAvgSpeedCondition.reLoad(path);
-        new MaxSpeedFillingFixed().fixed(path);
-        new LinearInterpolationFixed().fixed(path);
+        //        AllAvgSpeedCondition load = AllAvgSpeedCondition.reLoad(path);
+        //        new MaxSpeedFillingFixed().fixed(path);
+        //        new LinearInterpolationFixed().fixed(path);
         //        load.save("E:\\ZhongjianLv\\project\\jamprediction\\RoadStatistics\\MapShow\\data\\avgspeedfromrow\\48_48_20");
-        //        AllAvgSpeedCondition.toCondition(Parameter.PROJECTPATH + "data" + File.separator + "avgspeedfromrow\\2016\\03" + File.separator + "48_48_20_LinearInterpolationFixed");
-        //        AllAvgSpeedCondition.toCondition(Parameter.PROJECTPATH + "data" + File.separator + "avgspeedfromrow\\2016\\03" + File.separator + "48_48_20_MaxSpeedFillingFixed_20");
+        AllAvgSpeedCondition.toCondition(Parameter.PROJECTPATH + "data" + File.separator + "avgspeedfromrow\\2016\\all" + File.separator + "48_48_20_LinearInterpolationFixed");
+        AllAvgSpeedCondition.toCondition(Parameter.PROJECTPATH + "data" + File.separator + "avgspeedfromrow\\2016\\all" + File.separator + "48_48_20_MaxSpeedFillingFixed_5");
 
 
         //        System.out.println(load.getTimes().size());

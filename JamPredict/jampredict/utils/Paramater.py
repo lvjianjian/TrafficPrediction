@@ -26,7 +26,7 @@ if (path is None):
 else:
     PROJECTPATH = path
 
-DATAPATH = PROJECTPATH + "data/"
+DATAPATH = PROJECTPATH + "data"
 
 # 第一层为拥挤度(0-4), 第二层为轨迹数量
 Z_NUM = 2

@@ -30,11 +30,11 @@ from jampredict.utils.Cache import *
 np.random.seed(1337)  # for reproducibility
 
 CACHEDATA = True
-len_closeness = 3
-len_period = 1
-len_trend = 1
+len_closeness = 5
+len_period = 3
+len_trend = 2
 nb_flow = 1
-len_test = 300
+len_test = 800
 
 nb_residual_unit = 6  # residual unit size
 lr = 0.0002  # learning rate
@@ -46,7 +46,7 @@ path_result = 'RET'
 path_model = 'MODEL'
 
 is_mmn = True  # 是否需要最大最小归一化
-hasExternal = False
+hasExternal = True
 
 
 def build_model(external_dim, x_num, y_num):
@@ -71,27 +71,29 @@ def main():
     # load data
     print("loading data...")
     ts = time.time()
+    datapath = os.path.join(Paramater.DATAPATH, "2016", "all")
     if is_mmn:
-        fname = os.path.join(Paramater.DATAPATH, 'CACHE',
+        fname = os.path.join(datapath, 'CACHE',
                              'TaxiBJ_C{}_P{}_T{}_{}_mmn_speed.h5'.format(len_closeness, len_period, len_trend,
                                                                          "External" if hasExternal else "noExternal"))
     else:
-        fname = os.path.join(Paramater.DATAPATH, 'CACHE',
+        fname = os.path.join(datapath, 'CACHE',
                              'TaxiBJ_C{}_P{}_T{}_{}_speed.h5'.format(len_closeness, len_period, len_trend,
                                                                      "External" if hasExternal else "noExternal"))
     x_num = y_num = 48
+    pkl = fname + '.preprocessing_speed.pkl'
     if os.path.exists(fname) and CACHEDATA:
         X_train, Y_train, X_test, Y_test, mmn, external_dim, \
         timestamp_train, timestamp_test, noConditionRegions, x_num, y_num, z_num = read_cache(fname, is_mmn,
-                                                                                              'preprocessing_speed.pkl')
+                                                                                              pkl)
         print("load %s successfully" % fname)
     else:
-        datapaths = [Paramater.DATAPATH + "48_48_20_MaxSpeedFillingFixed_20"]
-        noConditionRegionsPath = Paramater.PROJECTPATH + "data/48_48_20_noSpeedRegion_0.05"
+        datapaths = [os.path.join(datapath , "48_48_20_MaxSpeedFillingFixed_5")]
+        noConditionRegionsPath = os.path.join(datapath ,"48_48_20_noSpeedRegion_0.05")
         X_train, Y_train, X_test, Y_test, mmn, external_dim, timestamp_train, timestamp_test, noConditionRegions, x_num, y_num, z_num = Data.loadDataFromRaw(
             paths=datapaths, noSpeedRegionPath=noConditionRegionsPath, nb_flow=nb_flow, len_closeness=len_closeness,
             len_period=len_period, len_trend=len_trend
-            , len_test=len_test, maxMinNormalization=is_mmn, preprocess_name='preprocessing_speed.pkl',
+            , len_test=len_test, maxMinNormalization=is_mmn, preprocess_name=pkl,
             meta_data=hasExternal,
             meteorol_data=hasExternal,
             holiday_data=hasExternal, isComplete=False)

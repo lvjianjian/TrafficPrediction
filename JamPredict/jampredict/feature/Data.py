@@ -75,8 +75,8 @@ def loadRawData(condition_path, nospeed_path, isComplete=True, complete_conditio
         nospeed_regions = h5['noConditionRegions'].value
         return datas, times, x_num, y_num, interval, startTime, endTime, nospeed_regions
 
-    file_names = condition_path.split("/")
-    names__split = file_names[len(file_names) - 1].split("_")
+    file_names = os.path.basename(condition_path)
+    names__split = file_names.split("_")
     x_num = int(names__split[0])
     y_num = int(names__split[1])
     interval = int(names__split[2])
@@ -371,6 +371,7 @@ def loadDataFromRaw(paths, noSpeedRegionPath, nb_flow=1, len_closeness=None, len
                     complete_condition_value=Paramater.CONDITION_CLEAR, complete_weight_value=0):
     """
     """
+
     if len_closeness is None:
         len_closeness = 0
     if len_period is None:
@@ -394,6 +395,8 @@ def loadDataFromRaw(paths, noSpeedRegionPath, nb_flow=1, len_closeness=None, len
         data_all.append(data)
         timestamps_all.append(timestamps)
         print("\n")
+
+
 
     # minmax_scale
     if maxMinNormalization:
