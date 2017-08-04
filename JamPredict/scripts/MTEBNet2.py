@@ -4,30 +4,37 @@
 """
 @Author: zhongjianlv
 
-@Create Date: 17-6-20, 22:09
+@Create Date: 17-8-3, 10:57
 
 @Description:
 
-@Update Date: 17-6-20, 22:09
+@Update Date: 17-8-3, 10:57
 """
 
-from __future__ import print_function
+from keras.layers.convolutional_recurrent import ConvLSTM2D
+from keras.layers import (
+    Input,
+    Activation,
+    merge,
+    Dense,
+    Reshape,
+    Layer
+)
+from keras.layers.convolutional import Convolution2D
+from keras.layers.normalization import BatchNormalization
+from keras.models import Model
 
 import os
 import time
-
 import deepst.metrics as metrics
 from jampredict.feature.Matrix import matrixsRounding
 import numpy as np
 from jampredict.model.STResNet import stresnet
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.optimizers import Adam
-
 from jampredict.feature import Data
 from jampredict.utils import Paramater, Metric
 from jampredict.utils.Cache import *
-
-np.random.seed(1337)  # for reproducibility
 
 CACHEDATA = True
 len_closeness = 5
@@ -48,23 +55,60 @@ path_model = 'MODEL'
 is_mmn = True  # 是否需要最大最小归一化
 hasExternal = True
 
+from keras import backend as K
+from keras.engine.topology import Layer
 
-def build_model(external_dim, x_num, y_num):
-    c_conf = (len_closeness, nb_flow, y_num,
-              x_num) if len_closeness > 0 else None
-    p_conf = (len_period, nb_flow, y_num,
-              x_num) if len_period > 0 else None
-    t_conf = (len_trend, nb_flow, y_num,
-              x_num) if len_trend > 0 else None
 
-    model = stresnet(c_conf=c_conf, p_conf=p_conf, t_conf=t_conf,
-                     external_dim=external_dim, nb_residual_unit=nb_residual_unit, isRegression=is_mmn)
-    adam = Adam(lr=lr)
-    model.compile(loss='mse', optimizer=adam, metrics=[metrics.rmse])
-    model.summary()
-    # from keras.utils.visualize_util import plot
-    # plot(model, to_file='model.png', show_shapes=True)
-    return model
+class iLayer(Layer):
+    def __init__(self, **kwargs):
+        # self.output_dim = output_dim
+        super(iLayer, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        initial_weight_value = np.random.random(input_shape[1:])
+        self.W = K.variable(initial_weight_value)
+        self.trainable_weights = [self.W]
+
+    def call(self, x, mask=None):
+        return x * self.W
+
+    def get_output_shape_for(self, input_shape):
+        return input_shape
+
+
+def _bn_relu_conv(nb_filter, nb_row, nb_col, subsample=(1, 1), bn=False):
+    def f(input):
+        if bn:
+            input = BatchNormalization(mode=0, axis=1)(input)
+        activation = Activation('relu')(input)
+        return Convolution2D(nb_filter=nb_filter, nb_row=nb_row, nb_col=nb_col, subsample=subsample,
+                             border_mode="same")(activation)
+
+    return f
+
+
+def _shortcut(input, residual):
+    return merge([input, residual], mode='sum')
+
+
+def _residual_unit(nb_filter, subsample=(1, 1)):
+    def f(input):
+        residual = _bn_relu_conv(nb_filter, 3, 3)(input)
+        residual = _bn_relu_conv(nb_filter, 3, 3)(residual)
+        return _shortcut(input, residual)
+
+    return f
+
+
+def ResUnits(residual_unit, nb_filter, repetations=1):
+    def f(input):
+        for i in range(repetations):
+            init_subsample = (1, 1)
+            input = residual_unit(nb_filter=nb_filter,
+                                  subsample=init_subsample)(input)
+        return input
+
+    return f
 
 
 def main():
@@ -88,8 +132,8 @@ def main():
                                                                                               pkl)
         print("load %s successfully" % fname)
     else:
-        datapaths = [os.path.join(datapath , "48_48_20_MaxSpeedFillingFixed_5")]
-        noConditionRegionsPath = os.path.join(datapath ,"48_48_20_noSpeedRegion_0.05")
+        datapaths = [os.path.join(datapath, "48_48_20_MaxSpeedFillingFixed_5")]
+        noConditionRegionsPath = os.path.join(datapath, "48_48_20_noSpeedRegion_0.05")
         X_train, Y_train, X_test, Y_test, mmn, external_dim, timestamp_train, timestamp_test, noConditionRegions, x_num, y_num, z_num = Data.loadDataFromRaw(
             paths=datapaths, noSpeedRegionPath=noConditionRegionsPath, nb_flow=nb_flow, len_closeness=len_closeness,
             len_period=len_period, len_trend=len_trend
@@ -111,8 +155,76 @@ def main():
         "**at the first time, it takes a few minites to compile if you use [Theano] as the backend**")
 
     ts = time.time()
-    model = build_model(external_dim, x_num=x_num, y_num=y_num)
-    hyperparams_name = 'speed.c{}.p{}.t{}.resunit{}.lr{}.{}.{}'.format(
+    print(X_train)
+
+    print "start build model"
+    main_inputs = []
+    main_outputs = []
+
+    if len_closeness > 0:
+        input = Input(shape=(nb_flow * len_closeness, x_num, y_num))
+        main_inputs.append(input)
+        # Conv1
+        conv1 = Convolution2D(
+            nb_filter=64, nb_row=3, nb_col=3, border_mode="same")(input)
+        # [nb_residual_unit] Residual Units
+        residual_output = ResUnits(_residual_unit, nb_filter=64,
+                                   repetations=nb_residual_unit)(conv1)
+        # Conv2
+        activation = Activation('relu')(residual_output)
+        conv2 = Convolution2D(
+            nb_filter=nb_flow, nb_row=3, nb_col=3, border_mode="same")(activation)
+        main_outputs.append(conv2)
+
+    if len_period > 0:
+        input = Input(shape=(nb_flow * len_period, x_num, y_num))
+        main_inputs.append(input)
+        conv1 = Convolution2D(nb_filter=64, nb_row=3, nb_col=3, border_mode="same")(input)
+        act1 = Activation("relu")(conv1)
+        reshape = Reshape((64, 1, x_num, y_num))(act1)
+        convLSTM = ConvLSTM2D(nb_filter=16, nb_row=3, nb_col=3, border_mode="same")(reshape)
+        act2 = Activation("relu")(convLSTM)
+        conv2 = Convolution2D(nb_filter=nb_flow, nb_row=3, nb_col=3, border_mode="same")(act2)
+        main_outputs.append(conv2)
+
+    if len_trend > 0:
+        input = Input(shape=(nb_flow * len_trend, x_num, y_num))
+        main_inputs.append(input)
+        conv1 = Convolution2D(nb_filter=64, nb_row=3, nb_col=3, border_mode="same")(input)
+        act1 = Activation("relu")(conv1)
+        reshape = Reshape((64, 1, x_num, y_num))(act1)
+        convLSTM = ConvLSTM2D(nb_filter=16, nb_row=3, nb_col=3, border_mode="same")(reshape)
+        act2 = Activation("relu")(convLSTM)
+        conv2 = Convolution2D(nb_filter=nb_flow, nb_row=3, nb_col=3, border_mode="same")(act2)
+        main_outputs.append(conv2)
+
+    if len(main_outputs) == 1:
+        main_output = main_outputs[0]
+    else:
+        new_outputs = []
+        for output in main_outputs:
+            new_outputs.append(iLayer()(output))
+        main_output = merge(new_outputs, mode='sum')
+
+    if external_dim != None and external_dim > 0:
+        # external input
+        external_input = Input(shape=(external_dim,))
+        main_inputs.append(external_input)
+        embedding = Dense(output_dim=10)(external_input)
+        embedding = Activation('relu')(embedding)
+        h1 = Dense(output_dim=nb_flow * x_num * y_num)(embedding)
+        activation = Activation('relu')(h1)
+        external_output = Reshape((nb_flow, x_num, y_num))(activation)
+        main_output = merge([main_output, external_output], mode='sum')
+
+    main_output = Activation('tanh')(main_output)
+    model = Model(input=main_inputs, output=main_output)
+    adam = Adam(lr=lr)
+    model.compile(loss='mse', optimizer=adam, metrics=[metrics.rmse])
+    model.summary()
+    print "finish build model"
+
+    hyperparams_name = 'testMyModel_speed.c{}.p{}.t{}.resunit{}.lr{}.{}.{}'.format(
         len_closeness, len_period, len_trend, nb_residual_unit, lr,
         "External" if hasExternal else "noExternal",
         "MMN" if is_mmn else "noMMN")
@@ -176,51 +288,6 @@ def main():
 
     print("\nelapsed time (eval): %.3f seconds\n" % (time.time() - ts))
     exit(1)
-
-    print('=' * 10)
-    print("training model (cont)...")
-    ts = time.time()
-    fname_param = os.path.join(
-        path_model, '{}.cont.best.h5'.format(hyperparams_name))
-    model_checkpoint = ModelCheckpoint(
-        fname_param, monitor='rmse', verbose=0, save_best_only=True, mode='min')
-    history = model.fit(X_train, Y_train, nb_epoch=nb_epoch_cont, verbose=2, batch_size=batch_size, callbacks=[
-        model_checkpoint])
-    pickle.dump((history.history), open(os.path.join(
-        path_result, '{}.cont.history.pkl'.format(hyperparams_name)), 'wb'))
-    model.save_weights(os.path.join(
-        path_model, '{}_cont.h5'.format(hyperparams_name)), overwrite=True)
-    print("\nelapsed time (training cont): %.3f seconds\n" % (time.time() - ts))
-
-    print('=' * 10)
-    print('evaluating using the final model')
-    score = model.evaluate(X_train, Y_train, batch_size=Y_train.shape[
-                                                            0] // 48, verbose=0)
-
-    if (mmn is not None):
-        print('Train score: %.6f rmse (norm): %.6f rmse (real): %.6f' %
-              (score[0], score[1], score[1] * (mmn._max - mmn._min) / 2.))
-    else:
-        print('Train score: %.6f rmse (real): %.6f' %
-              (score[0], score[1]))
-    ts = time.time()
-    score = model.evaluate(
-        X_test, Y_test, batch_size=Y_test.shape[0], verbose=0)
-    if mmn is not None:
-        print('Test score: %.6f rmse (norm): %.6f rmse (real): %.6f' %
-              (score[0], score[1], score[1] * (mmn._max - mmn._min) / 2.))
-    else:
-        print('Test score: %.6f rmse (real): %.6f' %
-              (score[0], score[1]))
-
-    if not is_mmn:
-        predict = model.predict(X_test)
-    else:
-        predict = mmn.inverse_transform(model.predict(X_test))
-    print("RMSE:", Metric.RMSE(predict, Y_test, noConditionRegions))
-    # print("accuracy", Metric.accuracy(predict, Y_test, noConditionRegions))
-
-    print("\nelapsed time (eval cont): %.3f seconds\n" % (time.time() - ts))
 
 
 if __name__ == '__main__':
