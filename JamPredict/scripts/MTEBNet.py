@@ -20,9 +20,12 @@ from keras.layers import (
     Reshape,
     Layer
 )
+from keras.layers.recurrent import SimpleRNN
 from keras.layers.convolutional import Convolution2D
 from keras.layers.normalization import BatchNormalization
 from keras.models import Model
+from keras import backend as K
+from keras.engine.topology import Layer
 
 import os
 import time
@@ -37,8 +40,8 @@ from jampredict.utils import Paramater, Metric
 from jampredict.utils.Cache import *
 
 CACHEDATA = True
-len_closeness = 0
-len_period = 3
+len_closeness = 10
+len_period = 0
 len_trend = 0
 nb_flow = 1
 len_test = 800
@@ -54,6 +57,58 @@ path_model = 'MODEL'
 
 is_mmn = True  # 是否需要最大最小归一化
 hasExternal = False
+
+
+class iLayer(Layer):
+    def __init__(self, **kwargs):
+        # self.output_dim = output_dim
+        super(iLayer, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        initial_weight_value = np.random.random(input_shape[1:])
+        self.W = K.variable(initial_weight_value)
+        self.trainable_weights = [self.W]
+
+    def call(self, x, mask=None):
+        return x * self.W
+
+    def get_output_shape_for(self, input_shape):
+        return input_shape
+
+
+def _bn_relu_conv(nb_filter, nb_row, nb_col, subsample=(1, 1), bn=False):
+    def f(input):
+        if bn:
+            input = BatchNormalization(mode=0, axis=1)(input)
+        activation = Activation('relu')(input)
+        return Convolution2D(nb_filter=nb_filter, nb_row=nb_row, nb_col=nb_col, subsample=subsample,
+                             border_mode="same")(activation)
+
+    return f
+
+
+def _shortcut(input, residual):
+    return merge([input, residual], mode='sum')
+
+
+def _residual_unit(nb_filter, subsample=(1, 1)):
+    def f(input):
+        residual = _bn_relu_conv(nb_filter, 3, 3)(input)
+        residual = _bn_relu_conv(nb_filter, 3, 3)(residual)
+        return _shortcut(input, residual)
+
+    return f
+
+
+def ResUnits(residual_unit, nb_filter, repetations=1):
+    def f(input):
+        for i in range(repetations):
+            init_subsample = (1, 1)
+            input = residual_unit(nb_filter=nb_filter,
+                                  subsample=init_subsample)(input)
+        return input
+
+    return f
 
 
 def main():
@@ -103,15 +158,29 @@ def main():
     print(X_train)
 
     print "start build model"
-    input = Input(shape=(nb_flow * len_period, x_num, y_num))
-    conv1 = Convolution2D(nb_filter=64, nb_row=3, nb_col=3, border_mode="same")(input)
-    act1 = Activation("relu")(conv1)
-    reshape = Reshape((64, 1, x_num, y_num))(act1)
+    # input = Input(shape=(nb_flow * len_closeness, x_num, y_num))
+    # # Conv1
+    # conv1 = Convolution2D(
+    #     nb_filter=64, nb_row=3, nb_col=3, border_mode="same")(input)
+    # # [nb_residual_unit] Residual Units
+    # residual_output = ResUnits(_residual_unit, nb_filter=64,
+    #                            repetations=nb_residual_unit)(conv1)
+    # # Conv2
+    # activation = Activation('relu')(residual_output)
+    # conv2 = Convolution2D(
+    #     nb_filter=nb_flow, nb_row=3, nb_col=3, border_mode="same")(activation)
+    # main_output = Activation('tanh')(conv2)
 
-    convLSTM = ConvLSTM2D(nb_filter=1, nb_row=3, nb_col=3, border_mode="same")(reshape)
-    # act2 = Activation("relu")(convLSTM)
-    # conv2 = Convolution2D(nb_filter=nb_flow, nb_row=3, nb_col=3, border_mode="same")(act2)
-    main_output = Activation('tanh')(convLSTM)
+    input = Input(shape=(nb_flow * len_closeness, x_num, y_num))
+    # conv1 = Convolution2D(nb_filter=64, nb_row=3, nb_col=3, border_mode="same")(input)
+    # act1 = Activation("relu")(conv1)
+    reshape = Reshape((len_closeness, nb_flow, x_num, y_num))(input)
+
+    convLSTM = ConvLSTM2D(nb_filter=32, nb_row=3, nb_col=3, border_mode="same", inner_activation="relu")(reshape)
+    act2 = Activation("relu")(convLSTM)
+    conv2 = Convolution2D(nb_filter=nb_flow, nb_row=3, nb_col=3, border_mode="same")(act2)
+    main_output = Activation('tanh')(conv2)
+
     model = Model(input=input, output=main_output)
     adam = Adam(lr=lr)
     model.compile(loss='mse', optimizer=adam, metrics=[metrics.rmse])

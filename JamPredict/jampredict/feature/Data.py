@@ -576,6 +576,20 @@ def transformCellToMatrix(predict, sample_size, x_num, y_num, z_num, noCondition
     return matrix
 
 
+def getSequenceXY(trainxs, trainy, step):
+    assert isinstance(trainxs, list)
+    n_sample = trainy.shape[0]
+    new_trainy = np.asarray([trainy[i - step:i] for i in range(step, n_sample + 1)])
+
+
+    new_trainxs = []
+    # for _ in range(len(trainxs)):
+    #     new_trainxs.append([])
+    for i in range(step):
+        for trainx in trainxs:
+            new_trainxs.append(np.asarray(trainx[i:n_sample - step + i + 1]))
+    return new_trainxs, new_trainy
+
 if __name__ == '__main__':
     # datas, times, x_num, y_num, interval, startTime, endTime, noConditionRegions = loadRawData(
     #     Paramater.PROJECTPATH + "data/48_48_20_LinearInterpolationFixed_condition",

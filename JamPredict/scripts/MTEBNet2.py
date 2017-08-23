@@ -176,13 +176,23 @@ def main():
             nb_filter=nb_flow, nb_row=3, nb_col=3, border_mode="same")(activation)
         main_outputs.append(conv2)
 
+        # input = Input(shape=(nb_flow * len_closeness, x_num, y_num))
+        # main_inputs.append(input)
+        # # conv1 = Convolution2D(nb_filter=64, nb_row=3, nb_col=3, border_mode="same")(input)
+        # # act1 = Activation("relu")(conv1)
+        # reshape = Reshape((len_closeness, nb_flow, x_num, y_num))(input)
+        # convLSTM = ConvLSTM2D(nb_filter=32, nb_row=3, nb_col=3, border_mode="same")(reshape)
+        # act2 = Activation("relu")(convLSTM)
+        # conv2 = Convolution2D(nb_filter=nb_flow, nb_row=3, nb_col=3, border_mode="same")(act2)
+        # main_outputs.append(conv2)
+
     if len_period > 0:
         input = Input(shape=(nb_flow * len_period, x_num, y_num))
         main_inputs.append(input)
-        conv1 = Convolution2D(nb_filter=64, nb_row=3, nb_col=3, border_mode="same")(input)
-        act1 = Activation("relu")(conv1)
-        reshape = Reshape((64, 1, x_num, y_num))(act1)
-        convLSTM = ConvLSTM2D(nb_filter=16, nb_row=3, nb_col=3, border_mode="same")(reshape)
+        # conv1 = Convolution2D(nb_filter=64, nb_row=3, nb_col=3, border_mode="same")(input)
+        # act1 = Activation("relu")(conv1)
+        reshape = Reshape((len_period, nb_flow, x_num, y_num))(input)
+        convLSTM = ConvLSTM2D(nb_filter=32, nb_row=3, nb_col=3, border_mode="same")(reshape)
         act2 = Activation("relu")(convLSTM)
         conv2 = Convolution2D(nb_filter=nb_flow, nb_row=3, nb_col=3, border_mode="same")(act2)
         main_outputs.append(conv2)
@@ -190,10 +200,10 @@ def main():
     if len_trend > 0:
         input = Input(shape=(nb_flow * len_trend, x_num, y_num))
         main_inputs.append(input)
-        conv1 = Convolution2D(nb_filter=64, nb_row=3, nb_col=3, border_mode="same")(input)
-        act1 = Activation("relu")(conv1)
-        reshape = Reshape((64, 1, x_num, y_num))(act1)
-        convLSTM = ConvLSTM2D(nb_filter=16, nb_row=3, nb_col=3, border_mode="same")(reshape)
+        # conv1 = Convolution2D(nb_filter=64, nb_row=3, nb_col=3, border_mode="same")(input)
+        # act1 = Activation("relu")(conv1)
+        reshape = Reshape((len_trend, nb_flow, x_num, y_num))(input)
+        convLSTM = ConvLSTM2D(nb_filter=32, nb_row=3, nb_col=3, border_mode="same")(reshape)
         act2 = Activation("relu")(convLSTM)
         conv2 = Convolution2D(nb_filter=nb_flow, nb_row=3, nb_col=3, border_mode="same")(act2)
         main_outputs.append(conv2)
@@ -288,6 +298,7 @@ def main():
 
     print("\nelapsed time (eval): %.3f seconds\n" % (time.time() - ts))
     exit(1)
+
 
 
 if __name__ == '__main__':
