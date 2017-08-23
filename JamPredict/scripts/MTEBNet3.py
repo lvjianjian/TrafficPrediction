@@ -39,9 +39,12 @@ from keras.optimizers import Adam
 from jampredict.feature import Data
 from jampredict.utils import Paramater, Metric
 from jampredict.utils.Cache import *
-from keras import initializations, activations
+from keras import initializers, activations
 from keras.engine.topology import InputSpec
 import functools
+from keras import backend as K
+from keras.engine.topology import Layer
+from theano.tensor.nnet import conv2d
 
 import theano
 import theano.tensor as T
@@ -67,10 +70,6 @@ step = 3
 is_mmn = True  # 是否需要最大最小归一化
 hasExternal = True
 
-from keras import backend as K
-from keras.engine.topology import Layer
-from theano.tensor.nnet import conv2d
-
 
 class eRNN(Layer):
     def __init__(self, hidden_dim, output_dim_shape, l, return_sequences=False, **kwargs):
@@ -90,10 +89,9 @@ class eRNN(Layer):
         # self.input_y_dim = input_shape[1][2]
         # self.input_length = input_shape[1][1]
         self.states = [None]
-        self.W_shape = (self.error_hidden_dim, self.n_past_error, 3, 3)
+        self.W_shape = (3, 3, self.n_past_error, self.error_hidden_dim)
         self.W = self.add_weight(self.W_shape,
-                                 initializer=functools.partial(initializations.get('glorot_uniform'),
-                                                               dim_ordering="th"),
+                                 initializer=initializers.get('glorot_uniform'),
                                  name='{}_W'.format(self.name),
                                  regularizer=None,
                                  constraint=None)
@@ -102,11 +100,10 @@ class eRNN(Layer):
                                  name='{}_b'.format(self.name),
                                  regularizer=None)
 
-        self.output_W_shape = (self.output_dim[0], self.error_hidden_dim, 3, 3)
+        self.output_W_shape = (3, 3, self.error_hidden_dim, self.output_dim[0])
 
         self.output_W = self.add_weight(self.output_W_shape,
-                                        initializer=functools.partial(initializations.get('glorot_uniform'),
-                                                                      dim_ordering="th"),
+                                        initializer=initializers.get('glorot_uniform'),
                                         name='{}_W'.format(self.name),
                                         regularizer=None,
                                         constraint=None)
@@ -115,7 +112,6 @@ class eRNN(Layer):
                                         initializer='zero',
                                         name='{}_b'.format(self.name),
                                         regularizer=None)
-
 
     def get_initial_states(self, x):
         # build an all-zero tensor of shape (n_pasr_errors,samples,) + output_shape
@@ -158,17 +154,15 @@ class eRNN(Layer):
         def _step(x_t, y_t, *errors):
             error = T.concatenate(errors, 1)
             o = K.conv2d(error, self.W, strides=(1, 1),
-                         border_mode="same",
-                         dim_ordering="th",
-                         filter_shape=self.W_shape)
+                         padding="same",
+                         data_format="channels_first")
             o += K.reshape(self.b, (1, self.error_hidden_dim, 1, 1))
 
             o = activations.get("relu")(o)
 
             o = K.conv2d(o, self.output_W, strides=(1, 1),
-                         border_mode="same",
-                         dim_ordering="th",
-                         filter_shape=self.output_W_shape)
+                         padding="same",
+                         data_format="channels_first")
 
             o += K.reshape(self.output_b, (1, self.output_dim[0], 1, 1))
 
