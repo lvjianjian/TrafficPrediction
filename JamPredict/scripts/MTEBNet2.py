@@ -37,9 +37,9 @@ from jampredict.utils import Paramater, Metric
 from jampredict.utils.Cache import *
 
 CACHEDATA = True
-len_closeness = 5
+len_closeness = 0
 len_period = 3
-len_trend = 1
+len_trend = 0
 nb_flow = 1
 len_test = 800
 
@@ -48,12 +48,12 @@ lr = 0.0002  # learning rate
 nb_epoch = 500  # number of epoch at training stage
 nb_epoch_cont = 100  # number of epoch at training (cont) stage
 batch_size = 32  # batch size
-
+month = "all"
 path_result = 'RET'
 path_model = 'MODEL'
 
 is_mmn = True  # 是否需要最大最小归一化
-hasExternal = True
+hasExternal = False
 
 from keras import backend as K
 from keras.engine.topology import Layer
@@ -115,7 +115,8 @@ def main():
     # load data
     print("loading data...")
     ts = time.time()
-    datapath = os.path.join(Paramater.DATAPATH, "2016", "all")
+
+    datapath = os.path.join(Paramater.DATAPATH, "2016", month)
     if is_mmn:
         fname = os.path.join(datapath, 'CACHE',
                              'TaxiBJ_C{}_P{}_T{}_{}_mmn_speed.h5'.format(len_closeness, len_period, len_trend,
@@ -135,12 +136,12 @@ def main():
         datapaths = [os.path.join(datapath, "48_48_20_MaxSpeedFillingFixed_5")]
         noConditionRegionsPath = os.path.join(datapath, "48_48_20_noSpeedRegion_0.05")
         X_train, Y_train, X_test, Y_test, mmn, external_dim, timestamp_train, timestamp_test, noConditionRegions, x_num, y_num, z_num = Data.loadDataFromRaw(
-            paths=datapaths, noSpeedRegionPath=noConditionRegionsPath, nb_flow=nb_flow, len_closeness=len_closeness,
-            len_period=len_period, len_trend=len_trend
-            , len_test=len_test, maxMinNormalization=is_mmn, preprocess_name=pkl,
-            meta_data=hasExternal,
-            meteorol_data=hasExternal,
-            holiday_data=hasExternal, isComplete=False)
+                paths=datapaths, noSpeedRegionPath=noConditionRegionsPath, nb_flow=nb_flow, len_closeness=len_closeness,
+                len_period=len_period, len_trend=len_trend
+                , len_test=len_test, maxMinNormalization=is_mmn, preprocess_name=pkl,
+                meta_data=hasExternal,
+                meteorol_data=hasExternal,
+                holiday_data=hasExternal, isComplete=False)
         if CACHEDATA:
             cache(fname, X_train, Y_train, X_test, Y_test,
                   external_dim, timestamp_train, timestamp_test, noConditionRegions, is_mmn, x_num, y_num,
@@ -166,14 +167,14 @@ def main():
         main_inputs.append(input)
         # Conv1
         conv1 = Convolution2D(
-            nb_filter=64, nb_row=3, nb_col=3, border_mode="same")(input)
+                nb_filter=64, nb_row=3, nb_col=3, border_mode="same")(input)
         # [nb_residual_unit] Residual Units
         residual_output = ResUnits(_residual_unit, nb_filter=64,
                                    repetations=nb_residual_unit)(conv1)
         # Conv2
         activation = Activation('relu')(residual_output)
         conv2 = Convolution2D(
-            nb_filter=nb_flow, nb_row=3, nb_col=3, border_mode="same")(activation)
+                nb_filter=nb_flow, nb_row=3, nb_col=3, border_mode="same")(activation)
         main_outputs.append(conv2)
 
         # input = Input(shape=(nb_flow * len_closeness, x_num, y_num))
@@ -234,21 +235,24 @@ def main():
     model.summary()
     print "finish build model"
 
-    hyperparams_name = 'testMyModel_speed.c{}.p{}.t{}.resunit{}.lr{}.{}.{}'.format(
-        len_closeness, len_period, len_trend, nb_residual_unit, lr,
-        "External" if hasExternal else "noExternal",
-        "MMN" if is_mmn else "noMMN")
+    hyperparams_name = 'testMyModel2_speed.c{}.p{}.t{}.resunit{}.lr{}.{}.{}'.format(
+            len_closeness, len_period, len_trend, nb_residual_unit, lr,
+            "External" if hasExternal else "noExternal",
+            "MMN" if is_mmn else "noMMN")
 
     fname_param = os.path.join(path_model, '{}.best.h5'.format(hyperparams_name))
 
-    early_stopping = EarlyStopping(monitor='val_rmse', patience=2, mode='min')
+    early_stopping = EarlyStopping(monitor='val_rmse', patience=4, mode='min')
     model_checkpoint = ModelCheckpoint(
-        fname_param, monitor='val_rmse', verbose=0, save_best_only=True, mode='min')
+            fname_param, monitor='val_rmse', verbose=0, save_best_only=True, mode='min')
 
     print("\nelapsed time (compiling model): %.3f seconds\n" %
           (time.time() - ts))
 
     print('=' * 10)
+    print "X_train shape:", X_train.shape
+    print "X_test shape:", X_test.shape
+
     print("training model...")
     ts = time.time()
     history = model.fit(X_train, Y_train,
@@ -258,9 +262,9 @@ def main():
                         callbacks=[early_stopping, model_checkpoint],
                         verbose=1)
     model.save_weights(os.path.join(
-        path_model, '{}.h5'.format(hyperparams_name)), overwrite=True)
+            path_model, '{}.h5'.format(hyperparams_name)), overwrite=True)
     pickle.dump((history.history), open(os.path.join(
-        path_result, '{}.history.pkl'.format(hyperparams_name)), 'wb'))
+            path_result, '{}.history.pkl'.format(hyperparams_name)), 'wb'))
     print("\nelapsed time (training): %.3f seconds\n" % (time.time() - ts))
 
     print('=' * 10)
@@ -277,7 +281,7 @@ def main():
               (score[0], score[1]))
 
     score = model.evaluate(
-        X_test, Y_test, batch_size=Y_test.shape[0], verbose=0)
+            X_test, Y_test, batch_size=Y_test.shape[0], verbose=0)
 
     if is_mmn:
         print('Test score: %.6f rmse (norm): %.6f rmse (real): %.6f' %
@@ -298,7 +302,6 @@ def main():
 
     print("\nelapsed time (eval): %.3f seconds\n" % (time.time() - ts))
     exit(1)
-
 
 
 if __name__ == '__main__':

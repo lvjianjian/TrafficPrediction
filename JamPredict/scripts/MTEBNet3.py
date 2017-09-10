@@ -24,6 +24,7 @@ from keras.layers import (
     Conv2D,
     Lambda
 )
+from keras.utils import np_utils
 from keras.layers.convolutional import Convolution2D
 from keras.layers.normalization import BatchNormalization
 from keras.models import Model
@@ -62,10 +63,13 @@ nb_epoch = 500  # number of epoch at training stage
 nb_epoch_cont = 100  # number of epoch at training (cont) stage
 batch_size = 32  # batch size
 
+month = "all"
 path_result = 'RET'
 path_model = 'MODEL'
 
-step = 3
+step = 10
+error_hidden_dim = 32
+l = 2
 
 is_mmn = True  # 是否需要最大最小归一化
 hasExternal = True
@@ -100,18 +104,18 @@ class eRNN(Layer):
                                  name='{}_b'.format(self.name),
                                  regularizer=None)
 
-        self.output_W_shape = (3, 3, self.error_hidden_dim, self.output_dim[0])
+        self.output_W_shape = (1, 1, self.error_hidden_dim, self.output_dim[0])
 
         self.output_W = self.add_weight(self.output_W_shape,
                                         initializer=initializers.get('glorot_uniform'),
-                                        name='{}_W'.format(self.name),
+                                        name='{}_W2'.format(self.name),
                                         regularizer=None,
                                         constraint=None)
 
-        self.output_b = self.add_weight((self.output_dim[0],),
-                                        initializer='zero',
-                                        name='{}_b'.format(self.name),
-                                        regularizer=None)
+        # self.output_b = self.add_weight((self.output_dim[0],),
+        #                                 initializer='zero',
+        #                                 name='{}_b2'.format(self.name),
+        #                                 regularizer=None)
 
     def get_initial_states(self, x):
         # build an all-zero tensor of shape (n_pasr_errors,samples,) + output_shape
@@ -164,9 +168,9 @@ class eRNN(Layer):
                          padding="same",
                          data_format="channels_first")
 
-            o += K.reshape(self.output_b, (1, self.output_dim[0], 1, 1))
+            # o += K.reshape(self.output_b, (1, self.output_dim[0], 1, 1))
 
-            o = activations.get("tanh")(o)
+            o = activations.get("relu")(o)
             o += x_t
             return [o - y_t, o]
 
@@ -177,22 +181,22 @@ class eRNN(Layer):
                                       outputs_info=[
                                           dict(initial=init_state, taps=[-i for i in range(self.n_past_error, 0, -1)]),
                                           None])
-
+        last_os = os[-1]
         axes = [1, 0] + list(range(2, os.ndim))
         os = os.dimshuffle(axes)
-        last_os = os[-1]
+
         if self.return_sequences:
             return os
         else:
             return last_os
 
-    def get_output_shape_for(self, input_shape):
+    def compute_output_shape(self, input_shape):
         print "get_output_shape_for", input_shape
         input_shape = input_shape[1]
         if self.return_sequences:
             output_shape = (input_shape[0], input_shape[1]) + self.output_dim
         else:
-            output_shape = (input_shape[0]) + self.output_dim
+            output_shape = (input_shape[0],) + self.output_dim
         print "output_shape:", output_shape
         return output_shape
 
@@ -241,6 +245,7 @@ def _bn_relu_conv(nb_filter, nb_row, nb_col, subsample=(1, 1), bn=False,
         else:
             o = Convolution2D(nb_filter=nb_filter, nb_row=nb_row, nb_col=nb_col, subsample=subsample,
                               border_mode="same")(activation)
+
         return o
 
     return f
@@ -255,7 +260,6 @@ def _residual_unit(nb_filter, subsample=(1, 1), share=False, shareIndex=[0], sha
         residual = _bn_relu_conv(nb_filter, 3, 3, shareIndex=shareIndex, share=share, shares=shares)(input)
         residual = _bn_relu_conv(nb_filter, 3, 3, shareIndex=shareIndex, share=share, shares=shares)(residual)
         return _shortcut(input, residual)
-
     return f
 
 
@@ -277,7 +281,7 @@ def main():
     # load data
     print("loading data...")
     ts = time.time()
-    datapath = os.path.join(Paramater.DATAPATH, "2016", "03")
+    datapath = os.path.join(Paramater.DATAPATH, "2016", month)
     if is_mmn:
         fname = os.path.join(datapath, 'CACHE',
                              'TaxiBJ_C{}_P{}_T{}_{}_mmn_speed.h5'.format(len_closeness, len_period, len_trend,
@@ -313,24 +317,29 @@ def main():
     print("\nelapsed time (loading data): %.3f seconds\n" % (time.time() - ts))
 
     print('=' * 10)
-    print("compiling model...")
+    print("compiling model_train...")
     print(
         "**at the first time, it takes a few minites to compile if you use [Theano] as the backend**")
 
     ts = time.time()
     X_train, Y_train = Data.getSequenceXY(X_train, Y_train, step)
+    Y_train_final = Y_train[:, -1]
+    X_test, Y_test = Data.getSequenceXY(X_test, Y_test, step)
+    Y_test_final = Y_test[:, -1]
     X_train.append(Y_train)
-    # print "X_train len:", len(X_train)
-    # for x in X_train:
+    X_test.append(Y_test)
+    # print "X_test len:", len(X_test)
+    # for x in X_test:
     #     print x.shape
-    print Y_train.shape
-    print z_num, x_num, y_num
-    print "start build model"
+    # print Y_test.shape
+    # print z_num, x_num, y_num
+    # exit(1)
+    print "start build model_train"
 
     outputs = []
     inputs = []
 
-    shared_conv1 = Convolution2D(nb_filter=64, nb_row=3, nb_col=3, border_mode="same")
+    shared_conv1 = Convolution2D(filters=64, kernel_size=(3, 3), padding="same")
     resUnit_share_index = [0]
     resUnit_share_layers = []
     shared_conv2 = Convolution2D(nb_filter=nb_flow, nb_row=3, nb_col=3, border_mode="same")
@@ -345,9 +354,6 @@ def main():
 
     shared_embeding = Dense(output_dim=10)
     shared_embeding2 = Dense(output_dim=nb_flow * x_num * y_num)
-
-    error_hidden_dim = 4
-    l = 2
 
     assert l < step
 
@@ -425,55 +431,59 @@ def main():
         outputs.append(main_output)
 
     main_output = merge(outputs, mode="concat", concat_axis=1)
-    main_output = Reshape((step, z_num, x_num, y_num))(main_output)
+    predict_sequence = Reshape((step, z_num, x_num, y_num))(main_output)
 
     input_targets = Input(shape=(step, z_num, x_num, y_num), name="input_targets")
-    main_output = eRNN(error_hidden_dim, (z_num, x_num, y_num), l, True)([main_output, input_targets])
+    main_output = eRNN(error_hidden_dim, (z_num, x_num, y_num), l, False)([predict_sequence, input_targets])
     inputs.append(input_targets)
 
-    model = Model(input=inputs, output=main_output)
+    model_train = Model(inputs=inputs, outputs=[predict_sequence, main_output])
     adam = Adam(lr=lr)
-    model.compile(loss='mse', optimizer=adam, metrics=[metrics.rmse])
-    model.summary()
-    print "finish build model"
+    model_train.compile(loss=['mse', 'mse'],
+                        loss_weights=[0.2, 1],
+                        optimizer=adam,
+                        metrics=[metrics.rmse])
+    # model_train.compile(loss=lambda y_true,y_preiod: K.mean(K.square(y_preiod - y_true), axis=-1), optimizer=adam, metrics=[metrics.rmse])
+    # model_predict = Model(input=inputs, output=main_output)
+    # model_predict.compile(optimizer=adam,loss="mse",metrics=metrics.rmse)
+    model_train.summary()
+    print "finish build model_train"
 
-    hyperparams_name = 'testMyModel_speed.c{}.p{}.t{}.resunit{}.lr{}.{}.{}'.format(
+    hyperparams_name = 'testMyModel3_speed.c{}.p{}.t{}.resunit{}.lr{}.{}.{}'.format(
         len_closeness, len_period, len_trend, nb_residual_unit, lr,
         "External" if hasExternal else "noExternal",
         "MMN" if is_mmn else "noMMN")
 
     fname_param = os.path.join(path_model, '{}.best.h5'.format(hyperparams_name))
+    early_stopping = EarlyStopping(monitor='val_e_rnn_1_rmse', patience=4, mode='min')
+    model_checkpoint = ModelCheckpoint(fname_param, monitor='val_e_rnn_1_rmse', verbose=0, save_best_only=True, mode='min',
+                                       save_weights_only=True)
 
-    early_stopping = EarlyStopping(monitor='val_rmse', patience=2, mode='min')
-    model_checkpoint = ModelCheckpoint(
-        fname_param, monitor='val_rmse', verbose=0, save_best_only=True, mode='min')
-
-    print("\nelapsed time (compiling model): %.3f seconds\n" %
+    print("\nelapsed time (compiling model_train): %.3f seconds\n" %
           (time.time() - ts))
 
     print('=' * 10)
-    print("training model...")
+    print("training model_train...")
     ts = time.time()
-    history = model.fit(X_train, Y_train,
-                        nb_epoch=nb_epoch,
-                        batch_size=batch_size,
-                        validation_split=0.1,
-                        callbacks=[early_stopping, model_checkpoint],
-                        verbose=1)
 
-    exit(1)
+    history = model_train.fit(X_train, [Y_train, Y_train_final],
+                              epochs=nb_epoch,
+                              batch_size=batch_size,
+                              validation_split=0.1,
+                              callbacks=[early_stopping, model_checkpoint],
+                              verbose=1)
 
-    model.save_weights(os.path.join(
+    model_train.save_weights(os.path.join(
         path_model, '{}.h5'.format(hyperparams_name)), overwrite=True)
     pickle.dump((history.history), open(os.path.join(
         path_result, '{}.history.pkl'.format(hyperparams_name)), 'wb'))
     print("\nelapsed time (training): %.3f seconds\n" % (time.time() - ts))
 
     print('=' * 10)
-    print('evaluating using the model that has the best loss on the valid set')
+    print('evaluating using the model_train that has the best loss on the valid set')
     ts = time.time()
-    model.load_weights(fname_param)
-    score = model.evaluate(X_train, Y_train, batch_size=Y_train.shape[0] // 48, verbose=0)
+    model_train.load_weights(fname_param)
+    score = model_train.evaluate(X_train, [Y_train, Y_train_final], batch_size=Y_train.shape[0] // 48, verbose=0)
 
     if is_mmn:
         print('Train score: %.6f rmse (norm): %.6f rmse (real): %.6f' %
@@ -482,8 +492,7 @@ def main():
         print('Train score: %.6f rmse (real): %.6f' %
               (score[0], score[1]))
 
-    score = model.evaluate(
-        X_test, Y_test, batch_size=Y_test.shape[0], verbose=0)
+    score = model_train.evaluate(X_test, [Y_test,Y_test_final], batch_size=Y_test.shape[0] // 12, verbose=0)
 
     if is_mmn:
         print('Test score: %.6f rmse (norm): %.6f rmse (real): %.6f' %
@@ -493,13 +502,17 @@ def main():
               (score[0], score[1]))
 
     if not is_mmn:
-        predict = model.predict(X_test)
+        predict = model_train.predict(X_test)[1]
     else:
-        predict = mmn.inverse_transform(model.predict(X_test))
-        Y_test = mmn.inverse_transform(Y_test)
+        predict = mmn.inverse_transform(model_train.predict(X_test)[1])
+        Y_test_final = mmn.inverse_transform(Y_test_final)
+
+    # predict = predict[:, -1]
+    # Y_test = Y_test[:, -1]
+
     print("predict", predict)
     print("test", Y_test)
-    print("RMSE:", Metric.RMSE(predict, Y_test, noConditionRegions))
+    print("RMSE:", Metric.RMSE(predict, Y_test_final, noConditionRegions))
     # print("accuracy", Metric.accuracy(predict, Y_test, noConditionRegions))
 
     print("\nelapsed time (eval): %.3f seconds\n" % (time.time() - ts))
