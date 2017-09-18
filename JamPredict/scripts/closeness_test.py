@@ -32,11 +32,12 @@ from keras.optimizers import Adam
 from jampredict.feature import Data
 from jampredict.utils import Paramater, Metric
 from jampredict.utils.Cache import *
+import pandas as pd
 
 CACHEDATA = True
-len_closeness = 0
-len_period = 3
-len_trend = 0
+len_closeness = 3
+len_period = 1
+len_trend = 1
 nb_flow = 1
 len_test = 800
 
@@ -50,7 +51,7 @@ path_result = 'RET'
 path_model = 'MODEL'
 
 is_mmn = True  # 是否需要最大最小归一化
-hasExternal = False
+hasExternal = True
 
 
 def CNN_model(x_num, y_num, period):
@@ -111,7 +112,7 @@ def RNN_model2(x_num, y_num, period):
 
 
 model_methods = [(CNN_model, "CNN_model"), (RNN_model, "RNN_model"), (RNN_model2, "RNN_model2")]
-periods = [1]
+clossesness = [1, 3, 5, 7, 9]
 
 from keras import backend as K
 from keras.engine.topology import Layer
@@ -175,6 +176,7 @@ def ResUnits(residual_unit, nb_filter, repetations=1):
             input = residual_unit(nb_filter=nb_filter,
                                   subsample=init_subsample)(input)
         return input
+
     return f
 
 
@@ -184,9 +186,9 @@ def average_method(X_test):
 
 def main():
     all_results = {}
-    for _period in periods:
-        len_period = _period
-        print "period is", len_period
+    for _c in clossesness:
+        len_closeness = _c
+        print "closeness is", len_closeness
         # load data
         print("loading data...")
         ts = time.time()
@@ -235,6 +237,7 @@ def main():
                 cache(fname, X_train, Y_train, X_test, Y_test,
                       external_dim, timestamp_train, timestamp_test, noConditionRegions, is_mmn, x_num, y_num,
                       Paramater.Z_NUM)
+
 
         # print("\n days (test): ", [v[:8] for v in timestamp_test[0::72]])
         print("\nelapsed time (loading data): %.3f seconds\n" % (time.time() - ts))
@@ -288,8 +291,14 @@ def main():
         # exit(1)
 
         results = {}
-        all_results[_period] = results
-        len_period = _period
+        if isinstance(X_test, list) and len(X_test) == 1:
+            X_test = X_test[0]
+        if isinstance(X_train, list) and len(X_train) == 1:
+            X_train = X_train[0]
+        if isinstance(Y_train, list) and len(Y_train) == 1:
+            Y_train = Y_train[0]
+        if isinstance(Y_test, list) and len(Y_test) == 1:
+            Y_test = Y_test[0]
         X_test_copy = X_test.copy()
         X_train_copy = X_train.copy()
         Y_train_copy = Y_train.copy()
@@ -311,7 +320,7 @@ def main():
             # convLSTM = ConvLSTM2D(nb_filter=32, nb_row=3, nb_col=3, border_mode="same")(reshape)
             # act2 = Activation("relu")(convLSTM)
             # main_output = Convolution2D(nb_filter=nb_flow, nb_row=3, nb_col=3, border_mode="same")(act2)
-            model = model_method(x_num, y_num, _period)
+            model = model_method(x_num, y_num, _c)
             adam = Adam(lr=lr)
             model.compile(loss='mse', optimizer=adam, metrics=[metrics.rmse])
             # model.summary()
@@ -393,7 +402,7 @@ def main():
         # print("test", Y_test)
         rmse = Metric.RMSE(predict, Y_test, noConditionRegions)
         results["avg_method"] = {"rmse": rmse}
-        print "period is {} and the final result is:".format(_period)
+        print "closeness is {} and the final result is:".format(_c)
         for method_name, vs in results.items():
             print method_name, ":"
             for _m, _v in vs.items():
@@ -401,13 +410,27 @@ def main():
         print ""
 
     print "all finish"
+
     for _p, _rs in all_results.items():
-        print "period is {} and the final result is:".format(_p)
+        print "closeness is {} and the final result is:".format(_p)
         for method_name, vs in _rs.items():
             print method_name, ":"
             for _m, _v in vs.items():
                 print "    ", _m, _v
         print ""
+
+    d = {}
+    for _method_name in model_methods:
+        d[_method_name] = {}
+    d["avg_method"] = {}
+
+    for _p, _rs in all_results.items():
+        for method_name, vs in _rs.items():
+            for _m, _v in vs.items():
+                if _m == "rmse":
+                    d[method_name][_p] = _v
+    clossesness_df = pd.DataFrame(d)
+    clossesness_df.to_csv("./result/clossness_rmse.csv",float_format="%.5f")
 
 
 if __name__ == '__main__':

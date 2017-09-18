@@ -23,8 +23,9 @@ month = "all"
 def main():
     print("loading data...")
     ts = time.time()
+    fn = "48_48_20_MaxSpeedFillingFixed_5"
     datapath = os.path.join(Paramater.DATAPATH, "2016", month)
-    datapath = os.path.join(datapath, "48_48_20_MaxSpeedFillingFixed_5")
+    datapath = os.path.join(datapath, fn)
     noConditionRegionsPath = os.path.join(datapath, "48_48_20_noSpeedRegion_0.05")
     datas, times, x_num, y_num, interval, startTime, endTime, nospeed_regions = \
         Data.loadRawData(datapath, noConditionRegionsPath, isComplete=False)
@@ -35,8 +36,9 @@ def main():
         diff.append(np.sqrt(np.sum((datas[i] - datas[i - 1]) ** 2)))
 
     df_diff = pd.DataFrame({"time": times[1:], "diff": diff}).sort(columns="diff", ascending=False)
-    print df_diff
+    df_diff.to_csv("./data/2016/all/" + fn +"_diff.csv")
 
+    print df_diff
     # print("\n days (test): ", [v[:8] for v in timestamp_test[0::72]])
     print("\nelapsed time (loading data): %.3f seconds\n" % (time.time() - ts))
 

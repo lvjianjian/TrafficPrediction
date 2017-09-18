@@ -56,6 +56,7 @@ len_period = 3
 len_trend = 1
 nb_flow = 1
 len_test = 800
+use_diff_test = True
 
 nb_residual_unit = 6  # residual unit size
 lr = 0.0002  # learning rate
@@ -260,6 +261,7 @@ def _residual_unit(nb_filter, subsample=(1, 1), share=False, shareIndex=[0], sha
         residual = _bn_relu_conv(nb_filter, 3, 3, shareIndex=shareIndex, share=share, shares=shares)(input)
         residual = _bn_relu_conv(nb_filter, 3, 3, shareIndex=shareIndex, share=share, shares=shares)(residual)
         return _shortcut(input, residual)
+
     return f
 
 
@@ -291,28 +293,29 @@ def main():
                              'TaxiBJ_C{}_P{}_T{}_{}_speed.h5'.format(len_closeness, len_period, len_trend,
                                                                      "External" if hasExternal else "noExternal"))
     pkl = fname + '.preprocessing_speed.pkl'
+    fn = "48_48_20_MaxSpeedFillingFixed_5"
     if os.path.exists(fname) and CACHEDATA:
         X_train, Y_train, X_test, Y_test, mmn, external_dim, \
         timestamp_train, timestamp_test, noConditionRegions, x_num, y_num, z_num = read_cache(fname, is_mmn,
                                                                                               pkl)
         print("load %s successfully" % fname)
     else:
-        datapaths = [os.path.join(datapath, "48_48_20_MaxSpeedFillingFixed_5")]
+        datapaths = [os.path.join(datapath, fn)]
         noConditionRegionsPath = os.path.join(datapath, "48_48_20_noSpeedRegion_0.05")
         X_train, Y_train, X_test, Y_test, mmn, external_dim, timestamp_train, timestamp_test, noConditionRegions, \
         x_num, y_num, z_num = Data.loadDataFromRaw(
-            paths=datapaths, noSpeedRegionPath=noConditionRegionsPath, nb_flow=nb_flow, len_closeness=len_closeness,
-            len_period=len_period, len_trend=len_trend
-            , len_test=len_test, maxMinNormalization=is_mmn, preprocess_name=pkl,
-            meta_data=hasExternal,
-            meteorol_data=hasExternal,
-            holiday_data=hasExternal, isComplete=False)
+                paths=datapaths, noSpeedRegionPath=noConditionRegionsPath, nb_flow=nb_flow, len_closeness=len_closeness,
+                len_period=len_period, len_trend=len_trend
+                , len_test=len_test, maxMinNormalization=is_mmn, preprocess_name=pkl,
+                meta_data=hasExternal,
+                meteorol_data=hasExternal,
+                holiday_data=hasExternal, isComplete=False)
 
         if CACHEDATA:
             cache(fname, X_train, Y_train, X_test, Y_test,
                   external_dim, timestamp_train, timestamp_test, noConditionRegions, is_mmn, x_num, y_num,
                   nb_flow)
-
+    z_num = nb_flow
     # print("\n days (test): ", [v[:8] for v in timestamp_test[0::72]])
     print("\nelapsed time (loading data): %.3f seconds\n" % (time.time() - ts))
 
@@ -322,27 +325,91 @@ def main():
         "**at the first time, it takes a few minites to compile if you use [Theano] as the backend**")
 
     ts = time.time()
+
     X_train, Y_train = Data.getSequenceXY(X_train, Y_train, step)
     Y_train_final = Y_train[:, -1]
     X_test, Y_test = Data.getSequenceXY(X_test, Y_test, step)
     Y_test_final = Y_test[:, -1]
     X_train.append(Y_train)
     X_test.append(Y_test)
+
+    timestamp_train = timestamp_train[step - 1:]
+    timestamp_test = timestamp_test[step - 1:]
+
+    if use_diff_test:
+        X_test_old = X_test
+        Y_test_old = Y_test
+        import pandas as pd
+        df_diff = pd.read_csv("./data/2016/all/" + fn + "_diff.csv", index_col=0)
+        # 大于200 有335个作为test
+        test_time = df_diff[df_diff["diff"] > 200]["time"].values
+        timestamp_train_dict = dict(zip(timestamp_train, range(len(timestamp_train))))
+        timestamp_test_dict = dict(zip(timestamp_test, range(len(timestamp_test))))
+        new_X_test = []
+        new_Y_test = []
+        if isinstance(X_train, list):
+            for _ in range(len(X_train)):
+                new_X_test.append([])
+        for _test_time in test_time:
+            _test_time = str(_test_time)
+            if (_test_time in timestamp_train_dict):
+                index = timestamp_train_dict[_test_time]
+                if isinstance(X_train, list):
+                    for i in range(len(X_train)):
+                        new_X_test[i].append(X_train[i][index])
+                else:
+                    new_X_test.append(X_train[index])
+                new_Y_test.append(Y_train[index])
+
+            if (_test_time in timestamp_test_dict):
+                index = timestamp_test_dict[_test_time]
+                if isinstance(X_test_old, list):
+                    for i in range(len(X_test_old)):
+                        new_X_test[i].append(X_test_old[i][index])
+                else:
+                    new_X_test.append(X_test_old[index])
+                new_Y_test.append(Y_test_old[index])
+
+                # if (_test_time not in timestamp_train_dict and _test_time not in timestamp_test_dict):
+                #     print(_test_time)
+
+        if isinstance(new_X_test, list):
+            for i in range(len(new_X_test)):
+                new_X_test[i] = np.stack(new_X_test[i], axis=0)
+        else:
+            new_X_test = np.stack(new_X_test, axis=0)
+        new_Y_test = np.stack(new_Y_test, axis=0)
+
+        # if isinstance(new_X_test, list):
+        #     for i in range(len(new_X_test)):
+        #         print(new_X_test[i].shape)
+        # else:
+        #     print(new_X_test.shape)
+        # print(new_Y_test.shape)
+        X_test = new_X_test
+        Y_test = new_Y_test
+        Y_test_final = Y_test[:, -1]
+
     # print "X_test len:", len(X_test)
     # for x in X_test:
     #     print x.shape
     # print Y_test.shape
     # print z_num, x_num, y_num
-    # exit(1)
     print "start build model_train"
 
     outputs = []
     inputs = []
 
-    shared_conv1 = Convolution2D(filters=64, kernel_size=(3, 3), padding="same")
-    resUnit_share_index = [0]
     resUnit_share_layers = []
+    resUnit_share_layers2 = []
+    resUnit_share_layers3 = []
+    shared_conv1 = Convolution2D(filters=64, kernel_size=(3, 3), padding="same")
     shared_conv2 = Convolution2D(nb_filter=nb_flow, nb_row=3, nb_col=3, border_mode="same")
+
+    shared_conv3 = Convolution2D(filters=64, kernel_size=(3, 3), padding="same")
+    shared_conv4 = Convolution2D(nb_filter=nb_flow, nb_row=3, nb_col=3, border_mode="same")
+    shared_conv5 = Convolution2D(filters=64, kernel_size=(3, 3), padding="same")
+    shared_conv6 = Convolution2D(nb_filter=nb_flow, nb_row=3, nb_col=3, border_mode="same")
 
     shared_convLSTM_period = ConvLSTM2D(nb_filter=32, nb_row=3, nb_col=3, border_mode="same")
     shared_conv_period = Convolution2D(nb_filter=nb_flow, nb_row=3, nb_col=3, border_mode="same")
@@ -356,7 +423,6 @@ def main():
     shared_embeding2 = Dense(output_dim=nb_flow * x_num * y_num)
 
     assert l < step
-
     for _ in range(step):
         main_outputs = []
         if len_closeness > 0:
@@ -386,24 +452,48 @@ def main():
         if len_period > 0:
             input = Input(shape=(nb_flow * len_period, x_num, y_num))
             inputs.append(input)
-            # conv1 = Convolution2D(nb_filter=64, nb_row=3, nb_col=3, border_mode="same")(input)
-            # act1 = Activation("relu")(conv1)
-            input = Reshape((len_period, nb_flow, x_num, y_num))(input)
-            convLSTM = shared_convLSTM_period(input)
-            act2 = Activation("relu")(convLSTM)
-            conv2 = shared_conv_period(act2)
+            # Conv1
+            conv1 = shared_conv3(input)
+            # [nb_residual_unit] Residual Units
+            resUnit_share_index = [0]
+            residual_output = ResUnits(_residual_unit, nb_filter=64, repetations=nb_residual_unit, share=True,
+                                       shareIndex=resUnit_share_index, shares=resUnit_share_layers2)(conv1)
+            # Conv2
+            activation = Activation('relu')(residual_output)
+            conv2 = shared_conv4(activation)
             main_outputs.append(conv2)
+            # input = Input(shape=(nb_flow * len_period, x_num, y_num))
+            # inputs.append(input)
+            # # conv1 = Convolution2D(nb_filter=64, nb_row=3, nb_col=3, border_mode="same")(input)
+            # # act1 = Activation("relu")(conv1)
+            # input = Reshape((len_period, nb_flow, x_num, y_num))(input)
+            # convLSTM = shared_convLSTM_period(input)
+            # act2 = Activation("relu")(convLSTM)
+            # conv2 = shared_conv_period(act2)
+            # main_outputs.append(conv2)
 
         if len_trend > 0:
             input = Input(shape=(nb_flow * len_trend, x_num, y_num))
             inputs.append(input)
-            # conv1 = Convolution2D(nb_filter=64, nb_row=3, nb_col=3, border_mode="same")(input)
-            # act1 = Activation("relu")(conv1)
-            reshape = Reshape((len_trend, nb_flow, x_num, y_num))(input)
-            convLSTM = shared_convLSTM_trend(reshape)
-            act2 = Activation("relu")(convLSTM)
-            conv2 = shared_conv_trend(act2)
+            # Conv1
+            conv1 = shared_conv5(input)
+            # [nb_residual_unit] Residual Units
+            resUnit_share_index = [0]
+            residual_output = ResUnits(_residual_unit, nb_filter=64, repetations=nb_residual_unit, share=True,
+                                       shareIndex=resUnit_share_index, shares=resUnit_share_layers3)(conv1)
+            # Conv2
+            activation = Activation('relu')(residual_output)
+            conv2 = shared_conv6(activation)
             main_outputs.append(conv2)
+            # input = Input(shape=(nb_flow * len_trend, x_num, y_num))
+            # inputs.append(input)
+            # # conv1 = Convolution2D(nb_filter=64, nb_row=3, nb_col=3, border_mode="same")(input)
+            # # act1 = Activation("relu")(conv1)
+            # reshape = Reshape((len_trend, nb_flow, x_num, y_num))(input)
+            # convLSTM = shared_convLSTM_trend(reshape)
+            # act2 = Activation("relu")(convLSTM)
+            # conv2 = shared_conv_trend(act2)
+            # main_outputs.append(conv2)
 
         if len(main_outputs) == 1:
             main_output = main_outputs[0]
@@ -434,8 +524,8 @@ def main():
     predict_sequence = Reshape((step, z_num, x_num, y_num))(main_output)
 
     input_targets = Input(shape=(step, z_num, x_num, y_num), name="input_targets")
-    main_output = eRNN(error_hidden_dim, (z_num, x_num, y_num), l, False)([predict_sequence, input_targets])
     inputs.append(input_targets)
+    main_output = eRNN(error_hidden_dim, (z_num, x_num, y_num), l, False)([predict_sequence, input_targets])
 
     model_train = Model(inputs=inputs, outputs=[predict_sequence, main_output])
     adam = Adam(lr=lr)
@@ -450,13 +540,14 @@ def main():
     print "finish build model_train"
 
     hyperparams_name = 'testMyModel3_speed.c{}.p{}.t{}.resunit{}.lr{}.{}.{}'.format(
-        len_closeness, len_period, len_trend, nb_residual_unit, lr,
-        "External" if hasExternal else "noExternal",
-        "MMN" if is_mmn else "noMMN")
+            len_closeness, len_period, len_trend, nb_residual_unit, lr,
+            "External" if hasExternal else "noExternal",
+            "MMN" if is_mmn else "noMMN")
 
     fname_param = os.path.join(path_model, '{}.best.h5'.format(hyperparams_name))
     early_stopping = EarlyStopping(monitor='val_e_rnn_1_rmse', patience=4, mode='min')
-    model_checkpoint = ModelCheckpoint(fname_param, monitor='val_e_rnn_1_rmse', verbose=0, save_best_only=True, mode='min',
+    model_checkpoint = ModelCheckpoint(fname_param, monitor='val_e_rnn_1_rmse', verbose=0, save_best_only=True,
+                                       mode='min',
                                        save_weights_only=True)
 
     print("\nelapsed time (compiling model_train): %.3f seconds\n" %
@@ -474,9 +565,9 @@ def main():
                               verbose=1)
 
     model_train.save_weights(os.path.join(
-        path_model, '{}.h5'.format(hyperparams_name)), overwrite=True)
+            path_model, '{}.h5'.format(hyperparams_name)), overwrite=True)
     pickle.dump((history.history), open(os.path.join(
-        path_result, '{}.history.pkl'.format(hyperparams_name)), 'wb'))
+            path_result, '{}.history.pkl'.format(hyperparams_name)), 'wb'))
     print("\nelapsed time (training): %.3f seconds\n" % (time.time() - ts))
 
     print('=' * 10)
@@ -492,7 +583,7 @@ def main():
         print('Train score: %.6f rmse (real): %.6f' %
               (score[0], score[1]))
 
-    score = model_train.evaluate(X_test, [Y_test,Y_test_final], batch_size=Y_test.shape[0] // 12, verbose=0)
+    score = model_train.evaluate(X_test, [Y_test, Y_test_final], batch_size=Y_test.shape[0] // 12, verbose=0)
 
     if is_mmn:
         print('Test score: %.6f rmse (norm): %.6f rmse (real): %.6f' %
@@ -510,9 +601,12 @@ def main():
     # predict = predict[:, -1]
     # Y_test = Y_test[:, -1]
 
-    print("predict", predict)
-    print("test", Y_test)
-    print("RMSE:", Metric.RMSE(predict, Y_test_final, noConditionRegions))
+    # print("predict", predict)
+    # print("test", Y_test_final)
+    rmse = round(Metric.RMSE(predict, Y_test_final, noConditionRegions), 6)
+    np.save("./result/{}_predict_rmse{}".format(hyperparams_name, str(rmse)),
+            np.stack([predict, Y_test_final], axis=0))
+    print("RMSE:", rmse)
     # print("accuracy", Metric.accuracy(predict, Y_test, noConditionRegions))
 
     print("\nelapsed time (eval): %.3f seconds\n" % (time.time() - ts))
