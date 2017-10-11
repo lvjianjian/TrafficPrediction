@@ -35,7 +35,7 @@ len_period = 3
 len_trend = 1
 nb_flow = 1
 len_test = 800
-use_diff_test = True
+use_diff_test = False
 
 nb_residual_unit = 6  # residual unit size
 lr = 0.0002  # learning rate
@@ -107,7 +107,7 @@ def main():
                                                                                      "External" if hasExternal else "noExternal"))
                     x_num = y_num = 48
                     pkl = fname + '.preprocessing_speed.pkl'
-                    fn = "48_48_20_MaxSpeedFillingFixed_5"
+                    fn = "48_48_20_LinearInterpolationFixed"
                     if os.path.exists(fname) and CACHEDATA:
                         X_train, Y_train, X_test, Y_test, mmn, external_dim, \
                         timestamp_train, timestamp_test, noConditionRegions, x_num, y_num, z_num = read_cache(fname,
@@ -201,8 +201,12 @@ def main():
                     fname_param = os.path.join(path_model, '{}.best.h5'.format(hyperparams_name))
 
                     early_stopping = EarlyStopping(monitor='val_rmse', patience=2, mode='min')
-                    model_checkpoint = ModelCheckpoint(
-                            fname_param, monitor='val_rmse', verbose=0, save_best_only=True, mode='min')
+                    model_checkpoint = ModelCheckpoint(fname_param,
+                                                       monitor='val_rmse',
+                                                       verbose=0,
+                                                       save_best_only=True,
+                                                       mode='min',
+                                                       save_weights_only=True)
 
                     print("\nelapsed time (compiling model): %.3f seconds\n" %
                           (time.time() - ts))
@@ -216,8 +220,7 @@ def main():
                                         validation_split=0.1,
                                         callbacks=[early_stopping, model_checkpoint],
                                         verbose=1)
-                    model.save_weights(os.path.join(
-                            path_model, '{}.h5'.format(hyperparams_name)), overwrite=True)
+                    model.save_weights(os.path.join(path_model, '{}.h5'.format(hyperparams_name)), overwrite=True)
                     pickle.dump((history.history), open(os.path.join(
                             path_result, '{}.history.pkl'.format(hyperparams_name)), 'wb'))
                     print("\nelapsed time (training): %.3f seconds\n" % (time.time() - ts))
@@ -299,9 +302,12 @@ def main():
                     # else:
                     #     predict = mmn.inverse_transform(model.predict(X_test))
 
-                    rmse = round(Metric.RMSE(predict, Y_test, noConditionRegions), 6)
-                    np.save("./result/{}_predict_rmse{}".format(hyperparams_name, str(rmse)),
-                            np.stack([predict, Y_test], axis=0))
+                    rmse = round(Metric.RMSE(predict, Y_test, noConditionRegions), 5)
+                    # np.save("./result/{}_predict_rmse{}".format(hyperparams_name, str(rmse)),
+                    #         np.stack([predict, Y_test], axis=0))
+                    save_result(predict, Y_test, timestamp_test,
+                                "./result/{}_predict_rmse{}".format(hyperparams_name, str(rmse)))
+
                     print("RMSE:", rmse)
 
                     # print("accuracy", Metric.accuracy(predict, Y_test, noConditionRegions))

@@ -5,3 +5,5 @@ data
 fig/
 MODEL/
 RET/
+*.out
+result/

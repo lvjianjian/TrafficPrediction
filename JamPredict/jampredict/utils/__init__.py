@@ -18,6 +18,8 @@ from Paramater import DATAPATH
 import h5py
 import urllib2
 
+TIME_FORMAT = "%Y%m%d%H%M"
+
 
 def timestamp2vec(timestamps):
     # tm_wday range [0, 6], Monday is 0

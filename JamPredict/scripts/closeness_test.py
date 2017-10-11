@@ -18,9 +18,10 @@ from keras.layers import (
     merge,
     Dense,
     Reshape,
-    Layer
+    Layer,
+    Lambda
 )
-from keras.layers.convolutional import Convolution2D
+from keras.layers.convolutional import Convolution2D, AveragePooling1D
 from keras.layers.normalization import BatchNormalization
 from keras.models import Model
 
@@ -36,12 +37,12 @@ import pandas as pd
 
 CACHEDATA = True
 len_closeness = 3
-len_period = 1
-len_trend = 1
+len_period = 0
+len_trend = 0
 nb_flow = 1
 len_test = 800
 
-nb_residual_unit = 6  # residual unit size
+nb_residual_unit = 10  # residual unit size
 lr = 0.0002  # learning rate
 nb_epoch = 500  # number of epoch at training stage
 nb_epoch_cont = 100  # number of epoch at training (cont) stage
@@ -51,7 +52,7 @@ path_result = 'RET'
 path_model = 'MODEL'
 
 is_mmn = True  # 是否需要最大最小归一化
-hasExternal = True
+hasExternal = False
 
 
 def CNN_model(x_num, y_num, period):
@@ -60,6 +61,49 @@ def CNN_model(x_num, y_num, period):
     conv1 = Convolution2D(filters=64, kernel_size=(3, 3), padding="same", data_format="channels_first")(input)
     # [nb_residual_unit] Residual Units
     residual_output = ResUnits(_residual_unit2, nb_filter=64,
+                               repetations=nb_residual_unit)(conv1)
+    # Conv2
+    activation = Activation('relu')(residual_output)
+    main_output = Convolution2D(nb_filter=nb_flow, nb_row=3, nb_col=3, border_mode="same")(activation)
+    main_output = Activation('tanh')(main_output)
+    model = Model(input=input, output=main_output)
+    return model
+
+
+def CNN_model2(x_num, y_num, period):
+    input = Input(shape=(nb_flow * period, x_num, y_num))
+    # Conv1
+    conv1 = Convolution2D(filters=64, kernel_size=(3, 3), padding="same", data_format="channels_first")(input)
+    # [nb_residual_unit] Residual Units
+    residual_output = ResUnits(_residual_unit, nb_filter=64,
+                               repetations=nb_residual_unit)(conv1)
+    # Conv2
+    activation = Activation('relu')(residual_output)
+    main_output = Convolution2D(nb_filter=nb_flow, nb_row=3, nb_col=3, border_mode="same")(activation)
+    main_output = Activation('tanh')(main_output)
+    model = Model(input=input, output=main_output)
+    return model
+
+def CNN_model4(x_num, y_num, period):
+    input = Input(shape=(nb_flow * period, x_num, y_num))
+    # Conv1
+    conv1 = Convolution2D(filters=64, kernel_size=(3, 3), padding="same", data_format="channels_first")(input)
+    # [nb_residual_unit] Residual Units
+    residual_output = ResUnits(_residual_unit4, nb_filter=64,
+                               repetations=nb_residual_unit)(conv1)
+    # Conv2
+    activation = Activation('relu')(residual_output)
+    main_output = Convolution2D(nb_filter=nb_flow, nb_row=3, nb_col=3, border_mode="same")(activation)
+    main_output = Activation('tanh')(main_output)
+    model = Model(input=input, output=main_output)
+    return model
+
+def CNN_model3(x_num, y_num, period):
+    input = Input(shape=(nb_flow * period, x_num, y_num))
+    # Conv1
+    conv1 = Convolution2D(filters=64, kernel_size=(3, 3), padding="same", data_format="channels_first")(input)
+    # [nb_residual_unit] Residual Units
+    residual_output = ResUnits(_residual_unit3, nb_filter=64,
                                repetations=nb_residual_unit)(conv1)
     # Conv2
     activation = Activation('relu')(residual_output)
@@ -90,6 +134,35 @@ def RNN_model(x_num, y_num, period):
     return model
 
 
+def RNN_model_multi(x_num, y_num, period):
+    input = Input(shape=(period * nb_flow, x_num, y_num))
+    reshape = Reshape((period, nb_flow, x_num, y_num))(input)
+    bn1 = BatchNormalization()(reshape)
+    convLSTM = ConvLSTM2D(nb_filter=32, kernel_size=(3, 3),
+                          border_mode="same",
+                          # recurrent_activation="relu",
+                          activation="relu",
+                          return_sequences=True)(bn1)
+    bn2 = BatchNormalization()(convLSTM)
+    convLSTM2 = ConvLSTM2D(nb_filter=32, kernel_size=(1, 1),
+                           border_mode="same",
+                           # recurrent_activation="relu",
+                           activation="relu",
+                           return_sequences=True,
+                           go_backwards=False)(bn2)
+    bn3 = BatchNormalization()(convLSTM2)
+    convLSTM3 = ConvLSTM2D(nb_filter=32, kernel_size=(1, 1),
+                           border_mode="same",
+                           # recurrent_activation="relu",
+                           activation="relu",
+                           return_sequences=False,
+                           go_backwards=False)(bn3)
+    output = Convolution2D(nb_filter=nb_flow, nb_row=3, nb_col=3, border_mode="same")(convLSTM3)
+    output = Activation('tanh')(output)
+    model = Model(input=input, output=output)
+    return model
+
+
 def RNN_model2(x_num, y_num, period):
     input = Input(shape=(period * nb_flow, x_num, y_num))
     reshape = Reshape((period, nb_flow, x_num, y_num))(input)
@@ -111,8 +184,33 @@ def RNN_model2(x_num, y_num, period):
     return model
 
 
-model_methods = [(CNN_model, "CNN_model"), (RNN_model, "RNN_model"), (RNN_model2, "RNN_model2")]
-clossesness = [1, 3, 5, 7, 9]
+def RNN_model2_modify(x_num, y_num, period):
+    input = Input(shape=(period * nb_flow, x_num, y_num))
+    reshape = Reshape((period, nb_flow, x_num, y_num))(input)
+    nb1 = BatchNormalization()(reshape)
+    convLSTM = ConvLSTM2D(nb_filter=32, kernel_size=(3, 3),
+                          border_mode="same",
+                          # recurrent_activation="relu",
+                          activation="relu",
+                          return_sequences=True)(nb1)
+    convLSTM2 = ConvLSTM2D(nb_filter=32, kernel_size=(3, 3),
+                           border_mode="same",
+                           # recurrent_activation="relu",
+                           activation="relu",
+                           return_sequences=True,
+                           go_backwards=True)(nb1)
+    convLSTM = merge([convLSTM, convLSTM2], mode="sum")
+    pool = Lambda(lambda x: K.sum(x, axis=1), output_shape=(32, x_num, y_num))(convLSTM)
+
+    output = Convolution2D(nb_filter=nb_flow, nb_row=3, nb_col=3, border_mode="same")(pool)
+    output = Activation('tanh')(output)
+    model = Model(input=input, output=output)
+    return model
+
+
+model_methods = [(CNN_model2, "CNN_model2")]
+# model_methods = [(RNN_model2_modify, "RNN_model2_modify")]
+clossesness = [5]
 
 from keras import backend as K
 from keras.engine.topology import Layer
@@ -155,7 +253,6 @@ def _residual_unit(nb_filter, subsample=(1, 1)):
         residual = _bn_relu_conv(nb_filter, 3, 3)(input)
         residual = _bn_relu_conv(nb_filter, 3, 3)(residual)
         return _shortcut(input, residual)
-
     return f
 
 
@@ -166,6 +263,23 @@ def _residual_unit2(nb_filter, subsample=(1, 1)):
         residual = _bn_relu_conv(nb_filter, 1, 1)(residual)
         return _shortcut(input, residual)
 
+    return f
+
+
+def _residual_unit3(nb_filter, subsample=(1, 1)):
+    def f(input):
+        residual = _bn_relu_conv(nb_filter, 3, 3)(input)
+        residual = _bn_relu_conv(nb_filter, 1, 1)(residual)
+        residual = _bn_relu_conv(nb_filter, 1, 1)(residual)
+        return _shortcut(input, residual)
+    return f
+
+def _residual_unit4(nb_filter, subsample=(1, 1)):
+    def f(input):
+        residual = _bn_relu_conv(nb_filter, 3, 3)(input)
+        residual = _bn_relu_conv(nb_filter, 1, 1)(residual)
+        # residual = _bn_relu_conv(nb_filter, 1, 1)(residual)
+        return _shortcut(input, residual)
     return f
 
 
@@ -237,7 +351,6 @@ def main():
                 cache(fname, X_train, Y_train, X_test, Y_test,
                       external_dim, timestamp_train, timestamp_test, noConditionRegions, is_mmn, x_num, y_num,
                       Paramater.Z_NUM)
-
 
         # print("\n days (test): ", [v[:8] for v in timestamp_test[0::72]])
         print("\nelapsed time (loading data): %.3f seconds\n" % (time.time() - ts))
@@ -322,26 +435,36 @@ def main():
             # main_output = Convolution2D(nb_filter=nb_flow, nb_row=3, nb_col=3, border_mode="same")(act2)
             model = model_method(x_num, y_num, _c)
             adam = Adam(lr=lr)
+            from keras.optimizers import SGD, RMSprop
+            sgd = SGD(lr, clipvalue=0.01)
+            rmsprop = RMSprop()
             model.compile(loss='mse', optimizer=adam, metrics=[metrics.rmse])
             # model.summary()
+            # exit(1)
             print "finish build model"
             result["build_time"] = time.time() - ts
 
             print("\nelapsed time (compiling model): %.3f seconds\n" %
                   (time.time() - ts))
 
-            hyperparams_name = 'testMyModel2_speed.c{}.p{}.t{}.resunit{}.lr{}.{}.{}'.format(
-                    len_closeness, len_period, len_trend, nb_residual_unit, lr,
-                    "External" if hasExternal else "noExternal",
-                    "MMN" if is_mmn else "noMMN")
+            hyperparams_name = 'closenesstest_{}_speed.c{}.p{}.t{}.resunit{}.lr{}.{}.{}'.format(name,
+                                                                                                len_closeness,
+                                                                                                len_period, len_trend,
+                                                                                                nb_residual_unit, lr,
+                                                                                                "External" if hasExternal else "noExternal",
+                                                                                                "MMN" if is_mmn else "noMMN")
 
             fname_param = os.path.join(path_model, '{}.best.h5'.format(hyperparams_name))
 
             early_stopping = EarlyStopping(monitor='val_rmse', patience=4, mode='min')
-            model_checkpoint = ModelCheckpoint(
-                    fname_param, monitor='val_rmse', verbose=0, save_best_only=True, mode='min')
+            model_checkpoint = ModelCheckpoint(fname_param,
+                                               monitor='val_rmse',
+                                               verbose=1,
+                                               save_best_only=True,
+                                               mode='min',
+                                               save_weights_only=True)
             print('=' * 10)
-
+            time.sleep(20)
             print("training model...")
             ts = time.time()
             history = model.fit(X_train, Y_train,
@@ -349,12 +472,12 @@ def main():
                                 batch_size=batch_size,
                                 validation_split=0.1,
                                 callbacks=[early_stopping, model_checkpoint],
-                                verbose=0)
+                                verbose=1)
+
             result["train_time"] = time.time() - ts
             print("\nelapsed time (training): %.3f seconds\n" % (time.time() - ts))
 
-            model.save_weights(os.path.join(
-                    path_model, '{}.h5'.format(hyperparams_name)), overwrite=True)
+            model.save_weights(os.path.join(path_model, '{}.h5'.format(hyperparams_name)), overwrite=True)
             pickle.dump((history.history), open(os.path.join(
                     path_result, '{}.history.pkl'.format(hyperparams_name)), 'wb'))
             print('=' * 10)
@@ -388,20 +511,22 @@ def main():
             # print("predict", predict)
             # print("test", Y_test)
             rmse = Metric.RMSE(predict, Y_test, noConditionRegions)
+            save_result(predict, Y_test, timestamp_test,
+                        "./result/{}_predict_rmse{}".format(hyperparams_name, str(rmse)))
             result["rmse"] = rmse
             print("RMSE:", rmse)
             # print("accuracy", Metric.accuracy(predict, Y_test, noConditionRegions))
             print("\nelapsed time (eval): %.3f seconds\n" % (time.time() - ts))
 
-        X_test = X_test_copy.copy()
-        Y_test = Y_test_copy.copy()
+        # X_test = X_test_copy.copy()
+        # Y_test = Y_test_copy.copy()
         # average
-        predict = mmn.inverse_transform(average_method(X_test))
-        Y_test = mmn.inverse_transform(Y_test)
+        # predict = mmn.inverse_transform(average_method(X_test))
+        # Y_test = mmn.inverse_transform(Y_test)
         # print("predict", predict)
         # print("test", Y_test)
-        rmse = Metric.RMSE(predict, Y_test, noConditionRegions)
-        results["avg_method"] = {"rmse": rmse}
+        # rmse = Metric.RMSE(predict, Y_test, noConditionRegions)
+        # results["avg_method"] = {"rmse": rmse}
         print "closeness is {} and the final result is:".format(_c)
         for method_name, vs in results.items():
             print method_name, ":"
@@ -430,7 +555,7 @@ def main():
                 if _m == "rmse":
                     d[method_name][_p] = _v
     clossesness_df = pd.DataFrame(d)
-    clossesness_df.to_csv("./result/clossness_rmse.csv",float_format="%.5f")
+    clossesness_df.to_csv("./result/clossness_rmse.csv", float_format="%.5f")
 
 
 if __name__ == '__main__':

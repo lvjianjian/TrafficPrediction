@@ -68,8 +68,9 @@ month = "all"
 path_result = 'RET'
 path_model = 'MODEL'
 
-step = 10
-error_hidden_dim = 32
+step = 5
+error_hidden_dim = 64
+ernn_weight = "glorot_normal"
 l = 2
 
 is_mmn = True  # 是否需要最大最小归一化
@@ -96,7 +97,7 @@ class eRNN(Layer):
         self.states = [None]
         self.W_shape = (3, 3, self.n_past_error, self.error_hidden_dim)
         self.W = self.add_weight(self.W_shape,
-                                 initializer=initializers.get('glorot_uniform'),
+                                 initializer=initializers.get('glorot_normal'),
                                  name='{}_W'.format(self.name),
                                  regularizer=None,
                                  constraint=None)
@@ -108,7 +109,7 @@ class eRNN(Layer):
         self.output_W_shape = (1, 1, self.error_hidden_dim, self.output_dim[0])
 
         self.output_W = self.add_weight(self.output_W_shape,
-                                        initializer=initializers.get('glorot_uniform'),
+                                        initializer=initializers.get(ernn_weight),
                                         name='{}_W2'.format(self.name),
                                         regularizer=None,
                                         constraint=None)
@@ -149,9 +150,14 @@ class eRNN(Layer):
         print type(init_state[0])
         print (init_state[0]).broadcastable
 
-        if len(init_state) > 0:
-            for i in range(1, 2 + len(self.output_dim)):
-                init_state[0] = T.unbroadcast(init_state[0], i)
+        if l != 1:
+            if len(init_state) > 0:
+                for i in range(1, 2 + len(self.output_dim)):
+                    init_state[0] = T.unbroadcast(init_state[0], i)
+        elif l == 1:
+            if len(init_state) > 0:
+                for i in range(1, 1 + len(self.output_dim)):
+                    init_state[0] = T.unbroadcast(init_state[0], i)
 
         # print (init_state[0]).broadcastable
         # exit(1)
@@ -532,21 +538,24 @@ def main():
     model_train.compile(loss=['mse', 'mse'],
                         loss_weights=[0.2, 1],
                         optimizer=adam,
-                        metrics=[metrics.rmse])
+                        metrics =[metrics.rmse])
     # model_train.compile(loss=lambda y_true,y_preiod: K.mean(K.square(y_preiod - y_true), axis=-1), optimizer=adam, metrics=[metrics.rmse])
     # model_predict = Model(input=inputs, output=main_output)
     # model_predict.compile(optimizer=adam,loss="mse",metrics=metrics.rmse)
     model_train.summary()
     print "finish build model_train"
 
-    hyperparams_name = 'testMyModel3_speed.c{}.p{}.t{}.resunit{}.lr{}.{}.{}'.format(
-            len_closeness, len_period, len_trend, nb_residual_unit, lr,
+    hyperparams_name = 'testMyModel4(ernn_{}_h{}_l{}_step{})_speed.c{}.p{}.t{}.resunit{}.lr{}.{}.{}'.format(
+            ernn_weight, error_hidden_dim, l, step, len_closeness, len_period, len_trend, nb_residual_unit, lr,
             "External" if hasExternal else "noExternal",
             "MMN" if is_mmn else "noMMN")
 
     fname_param = os.path.join(path_model, '{}.best.h5'.format(hyperparams_name))
     early_stopping = EarlyStopping(monitor='val_e_rnn_1_rmse', patience=4, mode='min')
-    model_checkpoint = ModelCheckpoint(fname_param, monitor='val_e_rnn_1_rmse', verbose=0, save_best_only=True,
+    model_checkpoint = ModelCheckpoint(fname_param,
+                                       monitor='val_e_rnn_1_rmse',
+                                       verbose=0,
+                                       save_best_only=True,
                                        mode='min',
                                        save_weights_only=True)
 
@@ -564,8 +573,7 @@ def main():
                               callbacks=[early_stopping, model_checkpoint],
                               verbose=1)
 
-    model_train.save_weights(os.path.join(
-            path_model, '{}.h5'.format(hyperparams_name)), overwrite=True)
+    model_train.save_weights(os.path.join(path_model, '{}.h5'.format(hyperparams_name)), overwrite=True)
     pickle.dump((history.history), open(os.path.join(
             path_result, '{}.history.pkl'.format(hyperparams_name)), 'wb'))
     print("\nelapsed time (training): %.3f seconds\n" % (time.time() - ts))

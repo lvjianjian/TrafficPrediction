@@ -81,14 +81,7 @@ def loadRawData(condition_path, nospeed_path, isComplete=True, complete_conditio
     y_num = int(names__split[1])
     interval = int(names__split[2])
 
-    with open(nospeed_path) as file:
-        lines = file.readline()
-        size = int(lines.strip())
-        regions = file.readline().strip().split(",")
-        regions.remove('')
-        nospeed_regions = []
-        for i in regions:
-            nospeed_regions.append(intToXY(int(i), y_num))
+    nospeed_regions = get_no_speed_region(nospeed_path, y_num)
 
     if (isComplete):
         timedelta = pd.Timedelta(str(interval) + 'minutes')
@@ -164,6 +157,18 @@ def loadRawData(condition_path, nospeed_path, isComplete=True, complete_conditio
         print type(nospeed_regions)
     print datas.shape, times
     return datas, times, x_num, y_num, interval, startTime, endTime, nospeed_regions
+
+
+def get_no_speed_region(nospeed_path, y_num):
+    with open(nospeed_path) as file:
+        lines = file.readline()
+        size = int(lines.strip())
+        regions = file.readline().strip().split(",")
+        regions.remove('')
+        nospeed_regions = []
+        for i in regions:
+            nospeed_regions.append(intToXY(int(i), y_num))
+    return nospeed_regions
 
 
 def remove_incomplete_days(data, timestamps, T=48):

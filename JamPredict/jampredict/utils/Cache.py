@@ -16,7 +16,7 @@ import cPickle as pickle
 import numpy as np
 
 
-def read_cache(fname, is_mmn,preprocess_fname='preprocessing.pkl'):
+def read_cache(fname, is_mmn, preprocess_fname='preprocessing.pkl'):
     if (is_mmn):
         mmn = pickle.load(open(preprocess_fname, 'rb'))
     else:
@@ -45,7 +45,7 @@ def read_cache(fname, is_mmn,preprocess_fname='preprocessing.pkl'):
     for i in range(noConditionRegions.shape[0]):
         noConditionRegionsSet.add((noConditionRegions[i][0], noConditionRegions[i][1]))
     return X_train, Y_train, X_test, Y_test, mmn, external_dim, timestamp_train, timestamp_test, noConditionRegionsSet, int(
-        x_num), int(y_num), int(z_num)
+            x_num), int(y_num), int(z_num)
 
 
 def cache(fname, X_train, Y_train, X_test, Y_test, external_dim, timestamp_train, timestamp_test, noConditionRegions,
@@ -77,13 +77,55 @@ def cache(fname, X_train, Y_train, X_test, Y_test, external_dim, timestamp_train
     h5.close()
 
 
+def save_result(predict, real, time_stamp, fname):
+    if ".h5" not in fname:
+        fname += ".h5"
+
+    h5 = h5py.File(fname, 'w')
+    h5.create_dataset('predict', data=predict)
+    h5.create_dataset('real', data=real)
+    h5.create_dataset('time', data=time_stamp)
+    h5.close()
+
+
+def read_result(fname):
+    if ".h5" not in fname:
+        fname += ".h5"
+
+    h5 = h5py.File(fname, 'r')
+    predict = h5['predict'].value
+    real = h5['real'].value
+    time = h5['time'].value
+    h5.close()
+    return predict, real, time
+
+
 if __name__ == '__main__':
     # h5 = h5py.File("test.h5", 'w')
     # h5.create_dataset('x_num', data=1)
     # h5.close()
 
-    f = h5py.File("test.h5", 'r')
-    x_num = f['x_num'].value
-    print x_num, type(x_num)
-    print int(x_num)
-    f.close()
+    # f = h5py.File("test.h5", 'r')
+    # x_num = f['x_num'].value
+    # print x_num, type(x_num)
+    # print int(x_num)
+    # f.close()
+    import pandas as pd
+
+    df_diff = pd.read_csv("../../data/2016/all/48_48_20_MaxSpeedFillingFixed_5_diff.csv", index_col=0)
+    top_diffs = df_diff.time[:3000].values
+    print top_diffs
+    exit(1)
+    p1, r1, t1 = read_result("../../result/speed.c5.p3.t1.resunit6.lr0.0002.External.MMN_predict_rmse2.24067")
+    import numpy as np
+
+    p2, r2, t2 = read_result("../../result/testMyModel4(ernn_h64_l2_step5)_speed.c5.p3.t1.resunit6.lr0.0002.External.MMN_predict_rmse2.22299")
+    from Metric import RMSE
+    from jampredict.feature.Data import get_no_speed_region
+
+    nospeed = get_no_speed_region("../../data/2016/all/48_48_20_noSpeedRegion_0.05", 48)
+    index1 = np.in1d(t1, top_diffs)
+    index2 = np.in1d(t2, top_diffs)
+
+    print "resnet", RMSE(p1[index1], r1[index1], nospeed), "compute ", index1.sum()
+    print "testmodel4", RMSE(p2[index2], r2[index2], nospeed), "compute ", index2.sum()
