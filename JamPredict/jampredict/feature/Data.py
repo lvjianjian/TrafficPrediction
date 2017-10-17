@@ -81,14 +81,7 @@ def loadRawData(condition_path, nospeed_path, isComplete=True, complete_conditio
     y_num = int(names__split[1])
     interval = int(names__split[2])
 
-    with open(nospeed_path) as file:
-        lines = file.readline()
-        size = int(lines.strip())
-        regions = file.readline().strip().split(",")
-        regions.remove('')
-        nospeed_regions = []
-        for i in regions:
-            nospeed_regions.append(intToXY(int(i), y_num))
+    nospeed_regions = get_no_speed_region(nospeed_path, y_num)
 
     if (isComplete):
         timedelta = pd.Timedelta(str(interval) + 'minutes')
@@ -164,6 +157,18 @@ def loadRawData(condition_path, nospeed_path, isComplete=True, complete_conditio
         print type(nospeed_regions)
     print datas.shape, times
     return datas, times, x_num, y_num, interval, startTime, endTime, nospeed_regions
+
+
+def get_no_speed_region(nospeed_path, y_num):
+    with open(nospeed_path) as file:
+        lines = file.readline()
+        size = int(lines.strip())
+        regions = file.readline().strip().split(",")
+        regions.remove('')
+        nospeed_regions = []
+        for i in regions:
+            nospeed_regions.append(intToXY(int(i), y_num))
+    return nospeed_regions
 
 
 def remove_incomplete_days(data, timestamps, T=48):
@@ -268,7 +273,7 @@ def deepcopy(x, memo=None, _nil=[]):
                             rv = reductor()
                         else:
                             raise Error(
-                                "un(deep)copyable object of type %s" % cls)
+                                    "un(deep)copyable object of type %s" % cls)
                 y = _reconstruct(x, rv, 1, memo)
 
     memo[d] = y
@@ -386,8 +391,12 @@ def loadDataFromRaw(paths, noSpeedRegionPath, nb_flow=1, len_closeness=None, len
     timestamps_all = list()
     for path in paths:
         print("file name: ", path)
-        datas, times, x_num, y_num, interval, startTime, endTime, noConditionRegions = \
-            loadRawData(path, noSpeedRegionPath, isComplete, complete_condition_value, complete_weight_value)
+        datas, times, x_num, y_num, interval, \
+        startTime, endTime, noConditionRegions = loadRawData(path,
+                                                             noSpeedRegionPath,
+                                                             isComplete,
+                                                             complete_condition_value,
+                                                             complete_weight_value)
         T = 24 * (60 // interval)
         # remove a certain day which does not have T timestamps
         data, timestamps = remove_incomplete_days(datas, times, T)
@@ -395,8 +404,6 @@ def loadDataFromRaw(paths, noSpeedRegionPath, nb_flow=1, len_closeness=None, len
         data_all.append(data)
         timestamps_all.append(timestamps)
         print("\n")
-
-
 
     # minmax_scale
     if maxMinNormalization:
@@ -421,8 +428,8 @@ def loadDataFromRaw(paths, noSpeedRegionPath, nb_flow=1, len_closeness=None, len
         # instance-based dataset --> sequences with format as (X, Y) where X is
         # a sequence of images and Y is an image.
         st = MyMatrix(data, timestamps, T)
-        _XC, _XP, _XT, _Y, _timestamps_Y = st.create_dataset(
-            len_closeness=len_closeness, len_period=len_period, len_trend=len_trend)
+        _XC, _XP, _XT, _Y, _timestamps_Y = st.create_dataset(len_closeness=len_closeness, len_period=len_period,
+                                                             len_trend=len_trend)
         XC.append(_XC)
         XP.append(_XP)
         XT.append(_XT)
@@ -447,9 +454,9 @@ def loadDataFromRaw(paths, noSpeedRegionPath, nb_flow=1, len_closeness=None, len
         print "meteorol_feature shape", meteorol_feature.shape
 
     meta_feature = np.hstack(meta_feature) if len(
-        meta_feature) > 0 else np.asarray(meta_feature)
+            meta_feature) > 0 else np.asarray(meta_feature)
     metadata_dim = meta_feature.shape[1] if len(
-        meta_feature.shape) > 1 else None
+            meta_feature.shape) > 1 else None
     if metadata_dim < 1:
         metadata_dim = None
     if meta_data and holiday_data and meteorol_data:
@@ -574,6 +581,23 @@ def transformCellToMatrix(predict, sample_size, x_num, y_num, z_num, noCondition
                     matrix[sample_index, i, x, y] = predict[index]
                     index += 1
     return matrix
+
+
+def getSequenceXY(trainxs, trainy, step):
+    n_sample = trainy.shape[0]
+    if isinstance(trainxs, list):
+        new_trainy = np.asarray([trainy[i - step:i] for i in range(step, n_sample + 1)])
+        new_trainxs = []
+        # for _ in range(len(trainxs)):
+        #     new_trainxs.append([])
+        for i in range(step):
+            for trainx in trainxs:
+                new_trainxs.append(np.asarray(trainx[i:n_sample - step + i + 1]))
+        return new_trainxs, new_trainy
+    else:
+        new_trainx = np.asarray([trainxs[i - step:i] for i in range(step, n_sample + 1)])
+        new_trainy = np.asarray([trainy[i - step:i] for i in range(step, n_sample + 1)])
+        return new_trainx, new_trainy
 
 
 if __name__ == '__main__':

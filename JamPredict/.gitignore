@@ -2,5 +2,8 @@
 data
 *.pyc
 *.rar
+fig/
 MODEL/
 RET/
+*.out
+result/
