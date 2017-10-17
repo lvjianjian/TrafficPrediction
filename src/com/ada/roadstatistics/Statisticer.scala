@@ -312,7 +312,7 @@ class Statisticer(val sc: SparkContext) extends Logging with Serializable {
     * @param lat_split   纬度划分数
     * @param month       统计第几月
     */
-  def regionNewAvgSpeedFromRowTraj(time_window: Int, min_edges: Int, max_edges: Int, region: Array[Double], lon_split: Int, lat_split: Int, month: Int, minSpeed: Double, maxSpeed: Double): Unit = {
+  def regionNewAvgSpeedFromRowTraj(time_window: Int, min_edges: Int, max_edges: Int, region: Array[Double], lon_split: Int, lat_split: Int, month: Int, minSpeed: Double, maxSpeed: Double, road_classes:Array[String]): Unit = {
     val loader = new GraphLoader(sc)
     val edges_RDD = loader.loadNewEdgeFromDataSource(Parameter.new_edge_data_path)
     val edges_broadcast = sc.broadcast(edges_RDD.collect().toMap)
@@ -343,7 +343,8 @@ class Statisticer(val sc: SparkContext) extends Logging with Serializable {
             var timeDifference: Int = 0
             while (index < edges.length
               && xy == Tool.getGridXY(region, lon_split, lat_split, Tool.getLonLat(edges_broadcast.value, index, temp._3, temp._4, edges))
-              && startTime == Tool.timeFormatByMinute(Tool.longToStringTime(times(index)), time_window)) {
+              && startTime == Tool.timeFormatByMinute(Tool.longToStringTime(times(index)), time_window)
+              && road_classes.contains(Tool.getRoadClass(edges_broadcast.value, index, edges))) {
               if (index == 0)
                 distance += temp._5._1
               else if (index == edges.length - 1)
@@ -370,12 +371,12 @@ class Statisticer(val sc: SparkContext) extends Logging with Serializable {
     if (month > 0) {
       savePath = Parameter.HDFS_BASE_RESULT_DIR + "TrafficConditionStatistic/regionAvgSpeedFromRowTraj/2016/" + "%02d".format(month) +
         "/min_edges=%d/max_edges=%d".format(min_edges, max_edges) +
-        "/region=%f_%f_%f_%f/lon_split=%d/lat_split=%d".format(region(0), region(1), region(2), region(3), lon_split, lat_split) +
+        "/region=%f_%f_%f_%f/lon_split=%d/lat_split=%d/road_classes=%s".format(region(0), region(1), region(2), region(3), lon_split, lat_split, road_classes.mkString("_")) +
         "/time_window=%d/withNum".format(time_window)
     } else {
       savePath = Parameter.HDFS_BASE_RESULT_DIR + "TrafficConditionStatistic/regionAvgSpeedFromRowTraj/2016/" + "all" +
         "/min_edges=%d/max_edges=%d".format(min_edges, max_edges) +
-        "/region=%f_%f_%f_%f/lon_split=%d/lat_split=%d".format(region(0), region(1), region(2), region(3), lon_split, lat_split) +
+        "/region=%f_%f_%f_%f/lon_split=%d/lat_split=%d/road_classes=%s".format(region(0), region(1), region(2), region(3), lon_split, lat_split,road_classes.mkString("_")) +
         "/time_window=%d/withNum".format(time_window)
     }
 
@@ -431,7 +432,15 @@ object Statisticer {
     //    statisticer.regionAvgSpeedFromRegionCount2(savePath, 20)
     //    statisticer.chooseTrajs("20160229233000","20160301000000")
 
-    statisticer.regionNewAvgSpeedFromRowTraj(20, 10, Int.MaxValue, statisticer.region3, 48, 48, -1, minSpeed = 1, maxSpeed = 38)
+    val road_classes = new Array[String](6)
+    road_classes(0) = "0x00"
+    road_classes(1) = "0x01"
+    road_classes(2) = "0x02"
+    road_classes(3) = "0x03"
+    road_classes(4) = "0x04"
+    road_classes(5) = "0x06"
+    statisticer.regionNewAvgSpeedFromRowTraj(20, 10, Int.MaxValue, statisticer.region3, 48, 48, 3,
+                                             minSpeed = 1, maxSpeed = 38, road_classes = road_classes)
     //    statisticer.regionAvgSpeedFromRowTraj(20, 10, Int.MaxValue, statisticer.region3, 48, 48)
 
   }

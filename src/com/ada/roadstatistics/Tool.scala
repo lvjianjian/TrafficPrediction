@@ -119,7 +119,7 @@ object Tool {
     * @param traj
     * @return
     */
-  def getLonLat(edges: Map[Long, ((Double, Double), (Double, Double), Int)], index: Int, start: (Double, Double), end: (Double, Double), traj: Array[Long]): (Double, Double) = {
+  def getLonLat(edges: Map[Long, ((Double, Double), (Double, Double), Int, String)], index: Int, start: (Double, Double), end: (Double, Double), traj: Array[Long]): (Double, Double) = {
     if (index == 0)
       start
     else if (index == traj.length - 1)
@@ -134,6 +134,14 @@ object Tool {
       }
     }
   }
+
+
+  def getRoadClass(edges: Map[Long, ((Double, Double), (Double, Double), Int, String)], index :Int, traj: Array[Long]) = {
+    val edge = edges.get(traj(index))
+    edge.get._4
+  }
+
+
 
 
   def main(args: Array[String]): Unit = {
