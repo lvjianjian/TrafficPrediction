@@ -32,7 +32,7 @@ class GraphLoader(val sc: SparkContext) extends Logging with Serializable{
     * @param edgeFile (edgeid,((起点经纬度),(终点经纬度),长度)
     * @return
     */
-  def loadNewEdgeFromDataSource(edgeFile: String): RDD[(Long, ((Double, Double), (Double, Double), Int, String))] = {
+  def loadNewEdgeFromDataSource(edgeFile: String): RDD[(Long, ((Double, Double), (Double, Double), Int, Int))] = {
     logInfo("Loading Edge data from %s".format(edgeFile))
     sc.textFile(edgeFile).map {
       x => val temp = x.split(":")
@@ -48,7 +48,7 @@ class GraphLoader(val sc: SparkContext) extends Logging with Serializable{
         val startLonLat = start.trim.split(" ")
         val end = ids(ids.length - 1)
         val endLonLat = end.trim.split(" ")
-        (id, ((startLonLat(0).toDouble, startLonLat(1).toDouble), (endLonLat(0).toDouble, endLonLat(1).toDouble), length, road_class))
+        (id, ((startLonLat(0).toDouble, startLonLat(1).toDouble), (endLonLat(0).toDouble, endLonLat(1).toDouble), length, Tool.road_class2int(road_class)))
     }
   }
 

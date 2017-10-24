@@ -12,6 +12,10 @@ class Statisticer(val sc: SparkContext) extends Logging with Serializable {
   val region2: Array[Double] = Array(116.275935, 39.840503, 116.495319, 40.000593);
   val region3: Array[Double] = Array(116.26954, 39.828598, 116.49167, 39.997132);
 
+
+  val road_classes: Array[Int] = Array(0,1,2,3,4,6);
+
+
   /**
     * 统计轨迹为以edge为单位的起始时间，总运行时间和轨迹数
     *
@@ -23,7 +27,8 @@ class Statisticer(val sc: SparkContext) extends Logging with Serializable {
   def count(time_window: Int, min_edges: Int, max_edges: Int, min_section_length: Int): Unit = {
     val edges_RDD = new GraphLoader(sc).loadEdgeFromDataSource(Parameter.edge_data_path)
     val edges_broadcast = sc.broadcast(edges_RDD.collect().toMap)
-    val source: RDD[(Long, Array[Long], Array[String])] = new TrajectoryLoader(sc).loadTrajectoryFromDataSource(Parameter.traj_data_path, min_edges, max_edges) //Parameter.traj_data_path
+    val source: RDD[(Long, Array[Long], Array[String])] = new TrajectoryLoader(sc).loadTrajectoryFromDataSource(Parameter.traj_data_path, min_edges, max_edges)
+    //Parameter.traj_data_path
     val map: RDD[((Long, String), (Int, Int))] = source.flatMap({
       temp =>
         var list: List[((Long, String), (Int, Int))] = Nil
@@ -218,7 +223,8 @@ class Statisticer(val sc: SparkContext) extends Logging with Serializable {
     val edges_broadcast = sc.broadcast(edges_RDD.collect().toMap)
     val vertex_RDD = loader.loadVertexFromDataSource(Parameter.vertex_data_path)
     val vertex_broadcast = sc.broadcast(vertex_RDD.collect().toMap)
-    val traj_RDD: RDD[(Long, Array[Long], Array[String])] = new TrajectoryLoader(sc).loadTrajectoryFromDataSource(Parameter.traj_data_path, min_edges, max_edges) //Parameter.traj_data_path
+    val traj_RDD: RDD[(Long, Array[Long], Array[String])] = new TrajectoryLoader(sc).loadTrajectoryFromDataSource(Parameter.traj_data_path, min_edges, max_edges)
+    //Parameter.traj_data_path
     val xytspeed_RDD: RDD[((Int, Int, String), Float)] = traj_RDD.flatMap({
       temp =>
         val edges = temp._2
@@ -273,7 +279,8 @@ class Statisticer(val sc: SparkContext) extends Logging with Serializable {
     * @param endTime
     */
   def chooseTrajs(startTime: String, endTime: String): Unit = {
-    val source: RDD[(Long, Array[Long], Array[String])] = new TrajectoryLoader(sc).loadTrajectoryFromDataSource(Parameter.traj_data_path, 10, Int.MaxValue) //Parameter.traj_data_path
+    val source: RDD[(Long, Array[Long], Array[String])] = new TrajectoryLoader(sc).loadTrajectoryFromDataSource(Parameter.traj_data_path, 10, Int.MaxValue)
+    //Parameter.traj_data_path
     val map: RDD[String] = source.flatMap({
       temp =>
         var list: List[String] = Nil
@@ -312,10 +319,12 @@ class Statisticer(val sc: SparkContext) extends Logging with Serializable {
     * @param lat_split   纬度划分数
     * @param month       统计第几月
     */
-  def regionNewAvgSpeedFromRowTraj(time_window: Int, min_edges: Int, max_edges: Int, region: Array[Double], lon_split: Int, lat_split: Int, month: Int, minSpeed: Double, maxSpeed: Double, road_classes:Array[String]): Unit = {
+  def regionNewAvgSpeedFromRowTraj(time_window: Int, min_edges: Int, max_edges: Int, region: Array[Double], lon_split: Int, lat_split: Int, month: Int,
+                                   minSpeed: Double, maxSpeed: Double, road_classes: Array[Int]): Unit = {
     val loader = new GraphLoader(sc)
     val edges_RDD = loader.loadNewEdgeFromDataSource(Parameter.new_edge_data_path)
     val edges_broadcast = sc.broadcast(edges_RDD.collect().toMap)
+    //    val road_classes_broadcast = sc.broadcast(road_classes)
     var trajPath = ""
     if (month > 0) {
       trajPath = Parameter.new_traj_data_path + "%02d".format(month) + "/*/"
@@ -324,7 +333,8 @@ class Statisticer(val sc: SparkContext) extends Logging with Serializable {
     }
 
     val traj_RDD: RDD[(Array[Long], Array[Long], (Double, Double), (Double, Double), (Int, Int))] =
-      new TrajectoryLoader(sc).loadNewTrajectoryFromDataSource(trajPath, min_edges, max_edges) //Parameter.traj_data_path
+      new TrajectoryLoader(sc).loadNewTrajectoryFromDataSource(trajPath, min_edges, max_edges)
+    //Parameter.traj_data_path
     val xytspeed_RDD: RDD[((Int, Int, String), Float)] = traj_RDD.flatMap({
       temp =>
         val edges = temp._1
@@ -344,7 +354,7 @@ class Statisticer(val sc: SparkContext) extends Logging with Serializable {
             while (index < edges.length
               && xy == Tool.getGridXY(region, lon_split, lat_split, Tool.getLonLat(edges_broadcast.value, index, temp._3, temp._4, edges))
               && startTime == Tool.timeFormatByMinute(Tool.longToStringTime(times(index)), time_window)
-              && road_classes.contains(Tool.getRoadClass(edges_broadcast.value, index, edges))) {
+              && Tool.inRoadClass(edges_broadcast.value, edges(index), road_classes)) {
               if (index == 0)
                 distance += temp._5._1
               else if (index == edges.length - 1)
@@ -354,6 +364,11 @@ class Statisticer(val sc: SparkContext) extends Logging with Serializable {
               timeDifference = timeDifference + Tool.timeDifference(Tool.longToStringTime(times(index)), Tool.longToStringTime(times(index + 1)))
               index = index + 1
             }
+
+            if(index < edges.length && !Tool.inRoadClass(edges_broadcast.value, edges(index), road_classes)){
+              index = index + 1
+            }
+
             if (timeDifference != 0) {
               val speed = distance / timeDifference.toFloat
               if (speed >= minSpeed && speed <= maxSpeed)
@@ -366,7 +381,6 @@ class Statisticer(val sc: SparkContext) extends Logging with Serializable {
         list
     })
 
-
     var savePath = ""
     if (month > 0) {
       savePath = Parameter.HDFS_BASE_RESULT_DIR + "TrafficConditionStatistic/regionAvgSpeedFromRowTraj/2016/" + "%02d".format(month) +
@@ -376,7 +390,7 @@ class Statisticer(val sc: SparkContext) extends Logging with Serializable {
     } else {
       savePath = Parameter.HDFS_BASE_RESULT_DIR + "TrafficConditionStatistic/regionAvgSpeedFromRowTraj/2016/" + "all" +
         "/min_edges=%d/max_edges=%d".format(min_edges, max_edges) +
-        "/region=%f_%f_%f_%f/lon_split=%d/lat_split=%d/road_classes=%s".format(region(0), region(1), region(2), region(3), lon_split, lat_split,road_classes.mkString("_")) +
+        "/region=%f_%f_%f_%f/lon_split=%d/lat_split=%d/road_classes=%s".format(region(0), region(1), region(2), region(3), lon_split, lat_split, road_classes.mkString("_")) +
         "/time_window=%d/withNum".format(time_window)
     }
 
@@ -432,15 +446,9 @@ object Statisticer {
     //    statisticer.regionAvgSpeedFromRegionCount2(savePath, 20)
     //    statisticer.chooseTrajs("20160229233000","20160301000000")
 
-    val road_classes = new Array[String](6)
-    road_classes(0) = "0x00"
-    road_classes(1) = "0x01"
-    road_classes(2) = "0x02"
-    road_classes(3) = "0x03"
-    road_classes(4) = "0x04"
-    road_classes(5) = "0x06"
-    statisticer.regionNewAvgSpeedFromRowTraj(20, 10, Int.MaxValue, statisticer.region3, 48, 48, 3,
-                                             minSpeed = 1, maxSpeed = 38, road_classes = road_classes)
+
+    statisticer.regionNewAvgSpeedFromRowTraj(5, 10, Int.MaxValue, statisticer.region3, 48, 48, -1,
+      minSpeed = 1, maxSpeed = 38, statisticer.road_classes)
     //    statisticer.regionAvgSpeedFromRowTraj(20, 10, Int.MaxValue, statisticer.region3, 48, 48)
 
   }

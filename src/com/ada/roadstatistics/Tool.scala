@@ -11,7 +11,7 @@ import org.apache.log4j.Logger
 
 object Tool {
 
-  val logger:Logger = Logger.getLogger(getClass.getName)
+  val logger: Logger = Logger.getLogger(getClass.getName)
 
 
   /**
@@ -26,8 +26,8 @@ object Tool {
       throw new Exception("time should be yyyyMMddHHmmss")
     }
 
-    val parse = LocalDateTime.parse(start_time,DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
-    return Duration.between(parse,LocalDateTime.parse(end_time,DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))).getSeconds.toInt
+    val parse = LocalDateTime.parse(start_time, DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
+    return Duration.between(parse, LocalDateTime.parse(end_time, DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))).getSeconds.toInt
 
 
   }
@@ -60,8 +60,8 @@ object Tool {
     * @param timeLong 长整形时间
     * @return 字符串时间，格式: YYYYMMDDHHmmss形式
     */
-  def longToStringTime(timeLong:Long): String ={
-    return LocalDateTime.ofEpochSecond(timeLong,0,ZoneOffset.of("+0800")).format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
+  def longToStringTime(timeLong: Long): String = {
+    return LocalDateTime.ofEpochSecond(timeLong, 0, ZoneOffset.of("+0800")).format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
   }
 
   /**
@@ -96,9 +96,9 @@ object Tool {
       return (-1, -1)
 
     val x_step = (right_up_lon - left_bottom_lon) / lon_split
-//    println(x_step)
+    //    println(x_step)
     val y_step = (right_up_lat - left_bottom_lat) / lat_split
-//    println(y_step)
+    //    println(y_step)
     var x, y = 0
     x = ((vertex_lon - left_bottom_lon) / x_step).toInt
     y = ((vertex_lat - left_bottom_lat) / y_step).toInt
@@ -119,14 +119,14 @@ object Tool {
     * @param traj
     * @return
     */
-  def getLonLat(edges: Map[Long, ((Double, Double), (Double, Double), Int, String)], index: Int, start: (Double, Double), end: (Double, Double), traj: Array[Long]): (Double, Double) = {
+  def getLonLat(edges: Map[Long, ((Double, Double), (Double, Double), Int, Int)], index: Int, start: (Double, Double), end: (Double, Double), traj: Array[Long]): (Double, Double) = {
     if (index == 0)
       start
     else if (index == traj.length - 1)
       end
     else {
       val edge = edges.get(traj(index))
-      if(edge != None)
+      if (edge != None)
         edge.get._1
       else {
         logger.error("warning！！！ miss " + traj(index))
@@ -136,27 +136,47 @@ object Tool {
   }
 
 
-  def getRoadClass(edges: Map[Long, ((Double, Double), (Double, Double), Int, String)], index :Int, traj: Array[Long]) = {
-    val edge = edges.get(traj(index))
-    edge.get._4
+  def inRoadClass(edges: Map[Long, ((Double, Double), (Double, Double), Int, Int)], edge_id: Long, road_classes: Array[Int]): Boolean = {
+    val edge = edges.get(edge_id)
+    if (edge != None) {
+      val rc: Int = edge.get._4
+      val r:Boolean = road_classes.contains(rc) // 加了这句话就不行？？ = .= 在调用地方引入了死循环，需要注意
+      r
+    }else{
+      false
+    }
   }
 
+  def road_class2int(road_class:String): Int ={
+    var r = -1
+    r = road_class match {
+      case "0x00" => 0
+      case "0x01" => 1
+      case "0x02" => 2
+      case "0x03" => 3
+      case "0x04" => 4
+      case "0x06" => 6
+      case "0x08" => 8
+      case "0x09" => 9
+      case "0x0b" => 11
+    }
 
-
+    r
+  }
 
   def main(args: Array[String]): Unit = {
-//    println(timeFormatByMinute("20160301000501",5))
-    println(timeDifference("20160229235957", "20160301000000"))
-    println(timeDifference("20160229235957", "20160229235959"))
-    println(timeDifference("20160229235957", "20160302000001"))
-//    println(timeFormatByMinute("20160301153959", 5))
-//    println("%dTimeWindow_%dMinEdges_%dMaxEdges_%dMinSectionLength".format(1, 1, 1, 1))
-//    println(getGridXY(Array(116.26954, 39.828598, 116.49167, 39.997132),80,80,(116.386463,39.845849)))
-//    val str = "LINESTRING (116.41563 39.7214, 116.41946 39.72185)"
-//    println(str.split("\\(")(1).split("\\)")(0).split(",")(0).split(" ")(0))
+    //    println(timeFormatByMinute("20160301000501",5))
+    //    println(timeDifference("20160229235957", "20160301000000"))
+    //    println(timeDifference("20160229235957", "20160229235959"))
+    //    println(timeDifference("20160229235957", "20160302000001"))
+    //    println(timeFormatByMinute("20160301153959", 5))
+    //    println("%dTimeWindow_%dMinEdges_%dMaxEdges_%dMinSectionLength".format(1, 1, 1, 1))
+    //    println(getGridXY(Array(116.26954, 39.828598, 116.49167, 39.997132),80,80,(116.386463,39.845849)))
+    //    val str = "LINESTRING (116.41563 39.7214, 116.41946 39.72185)"
+    //    println(str.split("\\(")(1).split("\\)")(0).split(",")(0).split(" ")(0))
 
-    println(longToStringTime(1459999642))
-    println(longToStringTime(1460002237))
+    //    println(longToStringTime(1459999642))
+    //    println(longToStringTime(1460002237))
   }
 }
 
