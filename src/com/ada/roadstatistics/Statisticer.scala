@@ -13,7 +13,7 @@ class Statisticer(val sc: SparkContext) extends Logging with Serializable {
   val region3: Array[Double] = Array(116.26954, 39.828598, 116.49167, 39.997132);
 
 
-  val road_classes: Array[Int] = Array(0,1,2,3,4,6);
+  val road_classes: Array[Int] = Array(0, 1, 2, 3, 4, 6);
 
 
   /**
@@ -365,7 +365,7 @@ class Statisticer(val sc: SparkContext) extends Logging with Serializable {
               index = index + 1
             }
 
-            if(index < edges.length && !Tool.inRoadClass(edges_broadcast.value, edges(index), road_classes)){
+            if (index < edges.length && !Tool.inRoadClass(edges_broadcast.value, edges(index), road_classes)) {
               index = index + 1
             }
 
@@ -405,6 +405,93 @@ class Statisticer(val sc: SparkContext) extends Logging with Serializable {
   }
 
 
+  /**
+    * 从原始 map maching 后的轨迹出发统计各个link在各个时间区间的平均速度（这里是以轨迹为单位统计的，物理意义比上面的方式强） 从16年轨迹数据统计
+    *
+    * @param time_window 统计的时间窗大小
+    * @param min_edges   过滤轨迹的最小边数
+    * @param max_edges   过滤轨迹的最大边数
+    * @param part_rg     子图path路径
+    * @param month       统计第几月
+    * @param minSpeed    统计时候的最小速度
+    *                    × @param maxSpeed    统计时候的最大速度
+    */
+  def linkNewAvgSpeedFromRowTraj(time_window: Int,
+                                 min_edges: Int,
+                                 max_edges: Int,
+                                 part_rg: String,
+                                 month: Int,
+                                 minSpeed: Double,
+                                 maxSpeed: Double): Unit = {
+    val loader = new GraphLoader(sc)
+    val edges_RDD = loader.loadNewPartEdgeFromDataSource(part_rg)
+    val edges_broadcast = sc.broadcast(edges_RDD.collect().toMap)
+    //    val road_classes_broadcast = sc.broadcast(road_classes)
+    var trajPath = ""
+    if (month > 0) {
+      trajPath = Parameter.new_traj_data_path + "%02d".format(month) + "/*/"
+    } else {
+      trajPath = Parameter.new_traj_data_path + "*" + "/*/"
+    }
+
+    val traj_RDD: RDD[(Array[Long], Array[Long], (Double, Double), (Double, Double), (Int, Int))] =
+      new TrajectoryLoader(sc).loadNewTrajectoryFromDataSource(trajPath, min_edges, max_edges)
+    //Parameter.traj_data_path
+    val xytspeed_RDD: RDD[((Long, String), Float)] = traj_RDD.flatMap({
+      temp =>
+        val edges = temp._1
+        val times = temp._2
+        var list: List[((Long, String), Float)] = Nil
+        var index: Int = 0
+        index = 1
+        val rg = edges_broadcast.value
+        while (index < edges.length - 1) {
+          //第一个和最后一个路段不看
+          val edge = edges(index)
+          if (rg.keySet.contains(edge)) {
+            // 在子图中
+            val start_time = times(index)
+            val end_time = times(index + 1)
+            val length: Int = rg.get(edge).get._5
+            val time_difference = Tool.timeDifference(Tool.longToStringTime(start_time),
+              Tool.longToStringTime(end_time))
+            val start_time_format = Tool.timeFormatByMinute(Tool.longToStringTime(start_time), time_window)
+            if (time_difference != 0) {
+              val speed = length.toFloat / time_difference
+              if (speed >= minSpeed && speed <= maxSpeed)
+                list = ((edge, start_time_format), speed) :: list
+            }
+          }
+          index = index + 1
+        }
+        list
+    })
+    val ss = part_rg.split("/")
+    var rg_part_str = ss(ss.length - 1).replace(".csv", "")
+    var savePath = ""
+    if (month > 0) {
+      savePath = Parameter.HDFS_BASE_RESULT_DIR + "TrafficConditionStatistic/linkAvgSpeedFromRowTraj/2016/" + "%02d".format(month) +
+        "/min_edges=%d/max_edges=%d".format(min_edges, max_edges) +
+        "/rg=%s".format(rg_part_str) +
+        "/time_window=%d".format(time_window)
+    } else {
+      savePath = Parameter.HDFS_BASE_RESULT_DIR + "TrafficConditionStatistic/linkAvgSpeedFromRowTraj/2016/" + "all" +
+        "/min_edges=%d/max_edges=%d".format(min_edges, max_edges) +
+        "/rg=%s".format(rg_part_str) +
+        "/time_window=%d".format(time_window)
+    }
+
+    xytspeed_RDD.map({
+      temp =>
+        (temp._1, (temp._2, 1))
+    }).reduceByKey((e1, e2) => (e1._1 + e2._1, e1._2 + e2._2)).map({
+      temp => (temp._1._2, (temp._1._1, temp._2._1 / temp._2._2.toFloat, temp._2._2))
+    }).groupByKey().map({
+      temp => temp._1 + "|" + temp._2.mkString("|")
+    }).coalesce(1).saveAsTextFile(savePath)
+  }
+
+
 }
 
 object Statisticer {
@@ -414,41 +501,15 @@ object Statisticer {
       //      .setMaster("local[2]")
       .setAppName("TrafficConditionStatistics")
     val sc = new SparkContext(conf)
-    //    val source = new GraphLoader(sc).loadNewEdgeFromDataSource("C:\\Users\\zhongjian\\Desktop\\R-G.csv")
-    //    println(source.count())
-    //    val collect = source.collect()
-    //    println(collect.toList(0)._1)
-    //    println(collect.toList(0)._2)
-    //    val source = new TrajectoryLoader(sc).loadNewTrajectoryFromDataSource("E:\\ZhongjianLv\\data\\raw\\2016\\05\\02\\BASIS_TRAJECTORY_2016_0",10,Int.MaxValue)
-    //    println(source.count())
-    //    val list = source.collect().toList(0)
-    //    println(list._1.mkString(","))
-    //    println(list._2.mkString(","))
-    //    println(list._3)
-    //    println(list._4)
-    //    println(list._5)
 
     val statisticer = new Statisticer(sc)
-    //    var traj_RDD: RDD[(Array[Long], Array[Long], (Double, Double), (Double, Double), (Int, Int))] =
-    //      new TrajectoryLoader(sc).loadNewTrajectoryFromDataSource(Parameter.new_traj_data_path+"03/*/", 0, Int.MaxValue)
-    //    println(traj_RDD.count())
-    //    traj_RDD =
-    //      new TrajectoryLoader(sc).loadNewTrajectoryFromDataSource(Parameter.new_traj_data_path+"03/22/*8", 0, Int.MaxValue)
-    //    println(traj_RDD.count())
-    //    traj_RDD =
-    //      new TrajectoryLoader(sc).loadNewTrajectoryFromDataSource(Parameter.new_traj_data_path+"03/22/*9", 0, Int.MaxValue)
-    //    println(traj_RDD.count())
-    //        statisticer.count(5,10,Int.MaxValue,0)
-    //    val savePath = statisticer.regionCount2(Parameter.HDFS_BASE_RESULT_DIR + "TrafficConditionStatistic/5TimeWindow_10MinEdges_2147483647MaxEdges_0MinSectionLength",
-    //      statisticer.region3, 48, 48)
-    //    val savePath = "E:\\"
-    //            val savePath = "/user/lvzhongjian/result/TrafficConditionStatistic/5TimeWindow_10MinEdges_2147483647MaxEdges_0MinSectionLength/detail/lon_split=80/lat_split=80/region=116.269540_39.828598_116.491670_39.997132"
-    //    statisticer.regionAvgSpeedFromRegionCount2(savePath, 20)
-    //    statisticer.chooseTrajs("20160229233000","20160301000000")
 
 
-    statisticer.regionNewAvgSpeedFromRowTraj(5, 10, Int.MaxValue, statisticer.region3, 48, 48, -1,
-      minSpeed = 1, maxSpeed = 38, statisticer.road_classes)
+    statisticer.linkNewAvgSpeedFromRowTraj(5, 10, Int.MaxValue,
+      part_rg = Parameter.HDFS_NODE_FRONT_PART + "/user/lvzhongjian/data/gaotong2016/R_G_0123class_45huan.csv",
+      month = -1,
+      minSpeed = 1,
+      maxSpeed = 50)
     //    statisticer.regionAvgSpeedFromRowTraj(20, 10, Int.MaxValue, statisticer.region3, 48, 48)
 
   }
