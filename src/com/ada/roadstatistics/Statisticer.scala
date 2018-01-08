@@ -414,7 +414,7 @@ class Statisticer(val sc: SparkContext) extends Logging with Serializable {
     * @param part_rg     子图path路径
     * @param month       统计第几月
     * @param minSpeed    统计时候的最小速度
-    *                    × @param maxSpeed    统计时候的最大速度
+    * @param maxSpeed    统计时候的最大速度
     */
   def linkNewAvgSpeedFromRowTraj(time_window: Int,
                                  min_edges: Int,
@@ -488,7 +488,58 @@ class Statisticer(val sc: SparkContext) extends Logging with Serializable {
       temp => (temp._1._2, (temp._1._1, temp._2._1 / temp._2._2.toFloat, temp._2._2))
     }).groupByKey().map({
       temp => temp._1 + "|" + temp._2.mkString("|")
+    }).coalesce(20).saveAsTextFile(savePath) //.coalesce(1)
+  }
+
+  /**
+    * 从 linkNewAvgSpeedFromRowTraj 所得的结果再统计,
+    * 通常在linkNewAvgSpeedFromRowTraj 细粒度统计的基础上(更广的地图，更细的时间间隔)
+    * 进行进一步统计
+    *
+    * @param result_path
+    * @param time_window
+    * @param part_rg
+    */
+  def linkNewAvgSpeedFromResult(result_path: String,
+                                time_window: Int,
+                                part_rg: String): Unit = {
+    val loader = new GraphLoader(sc)
+    val edges_RDD = loader.loadNewPartEdgeFromDataSource(part_rg)
+    val edges_broadcast = sc.broadcast(edges_RDD.collect().toMap)
+
+    val xytspeed_RDD: RDD[((Long, String), (Float, Int))] = sc.textFile(result_path + "part*").flatMap({
+      x =>
+        val rg = edges_broadcast.value
+        var list: List[((Long, String), (Float, Int))] = Nil
+        val strings = x.split("\\|")
+        val time = strings(0)
+        val time_start = Tool.timeFormatByMinute(time, time_window)
+        var index = 1
+        while (index < strings.length) {
+          val s = strings(index)
+          val splits = s.split("\\(")(1).split("\\)")(0).split(",")
+          val edge = splits(0).toLong
+          if (rg.keySet.contains(edge)) {
+            val ave_speed = splits(1).toFloat
+            val num = splits(2).toInt
+            val speed = num * ave_speed
+            list = ((edge, time_start), (speed, num)) :: list
+          }
+
+          index = index + 1
+        }
+        list
+    })
+    val ss = part_rg.split("/")
+    var rg_part_str = ss(ss.length - 1).replace(".csv", "")
+    val savePath = result_path + "/rg=%s".format(rg_part_str) +
+      "/time_window=%d".format(time_window)
+    xytspeed_RDD.reduceByKey((e1, e2) => (e1._1 + e2._1, e1._2 + e2._2)).map({
+      temp => (temp._1._2, (temp._1._1, temp._2._1 / temp._2._2.toFloat, temp._2._2))
+    }).groupByKey().map({
+      temp => temp._1 + "|" + temp._2.mkString("|")
     }).coalesce(1).saveAsTextFile(savePath)
+
   }
 
 
@@ -505,12 +556,17 @@ object Statisticer {
     val statisticer = new Statisticer(sc)
 
 
-    statisticer.linkNewAvgSpeedFromRowTraj(5, 10, Int.MaxValue,
-      part_rg = Parameter.HDFS_NODE_FRONT_PART + "/user/lvzhongjian/data/gaotong2016/R_G_0123class_45huan.csv",
-      month = -1,
-      minSpeed = 1,
-      maxSpeed = 50)
-    //    statisticer.regionAvgSpeedFromRowTraj(20, 10, Int.MaxValue, statisticer.region3, 48, 48)
+    //    statisticer.linkNewAvgSpeedFromRowTraj(5, 5, Int.MaxValue,
+    //      part_rg = Parameter.HDFS_NODE_FRONT_PART + "/user/lvzhongjian/data/gaotong2016/R_G_0123class_region1.csv",
+    //      month = -1,
+    //      minSpeed = 0.5,
+    //      maxSpeed = 50)
+    val r_path = "/user/lvzhongjian/result/TrafficConditionStatistic/linkAvgSpeedFromRowTraj/2016/all/min_edges=5/max_edges=2147483647/rg=R_G_0123class_region1/time_window=5/"
+    statisticer.linkNewAvgSpeedFromResult(Parameter.HDFS_NODE_FRONT_PART + r_path,
+      20,
+      Parameter.HDFS_NODE_FRONT_PART + "/user/lvzhongjian/data/gaotong2016/R_G_0123class_region1.csv")
 
+
+    //    statisticer.regionAvgSpeedFromRowTraj(20, 10, Int.MaxValue, statisticer.region3, 48, 48)
   }
 }

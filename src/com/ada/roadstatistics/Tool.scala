@@ -44,14 +44,23 @@ object Tool {
     if (time_window > 60 || time_window < 1)
       throw new Exception("time_window should be in 1 to 60 minutes")
 
-    val substring = time.substring(0, 10)
+    var substring:String = time.substring(0, 8)
     val substring1 = time.substring(10, 12)
     val minute = substring1.toInt
-    var temp = time_window * (minute / time_window)
+    val hour = time.substring(8,10).toInt
+    var z = ((hour * 60) + minute) / time_window
+    z = z * time_window
+    val temp = z / 60
+    val m = (z - temp * 60)
     if (temp < 10)
-      substring + "0" + temp
+      substring = substring + "0" + temp
     else
-      substring + temp
+      substring = substring + temp
+    if (m < 10)
+      substring = substring + "0" + m
+    else
+      substring = substring + m
+    substring
   }
 
 
@@ -165,6 +174,13 @@ object Tool {
   }
 
   def main(args: Array[String]): Unit = {
+
+    val s = "1|(1,1,1)"
+    val split = s.split("\\|")
+    println(split(0))
+    println(split(1))
+
+    println(split(1).split("\\(")(1).split("\\)")(0).split(",")(0))
     //    println(timeFormatByMinute("20160301000501",5))
     //    println(timeDifference("20160229235957", "20160301000000"))
     //    println(timeDifference("20160229235957", "20160229235959"))
@@ -177,6 +193,13 @@ object Tool {
 
     //    println(longToStringTime(1459999642))
     //    println(longToStringTime(1460002237))
+    println(timeFormatByMinute("201607290740",20))
+    println(timeFormatByMinute("20160301124501",50))
+    println(timeFormatByMinute("20160301123501",50))
+    println(timeFormatByMinute("20160301125501",50))
+    println(timeFormatByMinute("20160301122201",50))
+    println(timeFormatByMinute("20160301120501",50))
+    println(timeFormatByMinute("20160301235501",50))
   }
 }
 
